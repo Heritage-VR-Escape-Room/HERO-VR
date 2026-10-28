@@ -1,4 +1,9 @@
 {
   "ui.menu.continue": "Fortsetzen",
-  "ui.menu.new": "Neues Spiel"
+  "ui.menu.new": "Neues Spiel",
+  "prompt.inspect": "Untersuchen",
+  "prompt.pickup": "Nehmen",
+  "prompt.read": "Lesen",
+  "ui.inspect.hint": "Ziehen zum Drehen · Mausrad zum Zoomen · Esc zum Schließen",
+  "ui.document.close": "Schließen"
 }

@@ -9,6 +9,7 @@ import { shouldRender } from './logic/frameCap';
 import { createFixedStep } from './logic/fixedStep';
 import { createGameState } from './logic/gameState';
 import { isTestMode } from './test/hooks';
+import type { I18n } from './logic/i18n';
 import type { WebGPURenderer } from 'three/webgpu';
 
 type SettingsService = ReturnType<typeof createSettingsService>;
@@ -83,15 +84,35 @@ async function startFlat(
   canvas: HTMLCanvasElement,
   settings: SettingsService,
   backend: Backend,
+  i18n: I18n,
+  params: URLSearchParams,
 ): Promise<void> {
-  const [{ PhysicsWorld }, { createFlatWorld }, { PlayerController }, { KeyboardInput }, { PointerLock }, { createPauseStub }] =
-    await Promise.all([
+  const [
+    { PhysicsWorld },
+    { createFlatWorld },
+    { PlayerController },
+    { KeyboardInput },
+    { PointerLock },
+    { createPauseStub },
+    { Interactor },
+    { InspectView },
+    { createModalSession },
+    { createInventory },
+    { createInteractPrompt, codeLabel },
+    { initDocumentView },
+  ] = await Promise.all([
       import('./world/colliders'),
       import('./world/flat'),
       import('./player/controller'),
       import('./player/input'),
       import('./player/pointerLock'),
       import('./ui/pause'),
+      import('./interaction/interactor'),
+      import('./interaction/inspect'),
+      import('./interaction/modal'),
+      import('./logic/inventory'),
+      import('./ui/prompt'),
+      import('./ui/documentView'),
     ]);
   const physics = await PhysicsWorld.create();
   const world = await createFlatWorld(renderer, physics, effectiveGraphics(settings, backend));
@@ -103,7 +124,27 @@ async function startFlat(
   controller.teleport(world.spawn, world.spawnYaw);
   const state = createGameState('menu');
   const pause = createPauseStub();
-  new PointerLock({ canvas, state, pause, controller, clearInput: () => keyboard.clear() });
+  const pointerLock = new PointerLock({ canvas, state, pause, controller, clearInput: () => keyboard.clear() });
+
+  const modal = createModalSession({ pointerLock, controller, clearInput: () => keyboard.clear() });
+  const inventory = createInventory();
+  const inspect = new InspectView({ renderer, camera: world.camera, post: world.post, modal, i18n, canvas });
+  initDocumentView({ i18n, onOpenChange: (open) => (open ? modal.enter() : modal.exit()) });
+  const interactor = new Interactor({
+    physics,
+    camera: world.camera,
+    target: window,
+    bindings: () => settings.get().bindings,
+    enabled: () => state.get() === 'playing' && !modal.isActive(),
+  });
+  const prompt = createInteractPrompt(i18n, () => codeLabel(settings.get().bindings.interact));
+  interactor.onFocusChange((i) => prompt.show(i?.promptKey ?? null));
+  let testCube: import('./world/testCube').TestCube | undefined;
+  if (params.get('props') === 'testcube') {
+    const { createTestCube } = await import('./world/testCube');
+    testCube = createTestCube(world.scene, physics, (mesh) => inspect.open(mesh));
+    interactor.register(testCube.interactable);
+  }
 
   // The post chain is built once; only the frame cap follows settings live.
   let frameCap = effectiveGraphics(settings, backend).frameCap;
@@ -126,6 +167,10 @@ async function startFlat(
     pauseOpen: () => pause.isOpen(),
     gameState: () => state.get(),
     steps: () => [...steps],
+    focusedId: () => interactor.focused()?.id ?? null,
+    inspectOpen: () => inspect.isOpen(),
+    inventory: () => [...inventory.items()],
+    placeTestCube: (d: number) => testCube?.place(world.camera, d),
   });
 
   const fixed = createFixedStep(PHYSICS_HZ, MAX_SUBSTEPS);
@@ -139,10 +184,12 @@ async function startFlat(
       physics.step(h);
     });
     controller.update(dt, alpha);
+    interactor.update();
     if (!shouldRender(t, lastRender, frameCap)) return;
     lastRender = t;
     world.rig.update(world.camera.position);
     world.post.render();
+    inspect.render();
     frames++;
   });
 }
@@ -173,7 +220,7 @@ async function boot(): Promise<void> {
 
   const scene = params.get('scene');
   if (scene === 'fogtest') await startFogTest(renderer, params, backend);
-  else if (scene === 'flat') await startFlat(renderer, canvas, createSettingsService(localKV()), backend);
+  else if (scene === 'flat') await startFlat(renderer, canvas, createSettingsService(localKV()), backend, i18n, params);
 
   console.log(`HERO_READY backend=${backend}`);
 }

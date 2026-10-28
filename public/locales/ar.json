@@ -1,4 +1,9 @@
 {
   "ui.menu.continue": "متابعة",
-  "ui.menu.new": "لعبة جديدة"
+  "ui.menu.new": "لعبة جديدة",
+  "prompt.inspect": "فحص",
+  "prompt.pickup": "التقاط",
+  "prompt.read": "قراءة",
+  "ui.inspect.hint": "اسحب للتدوير · العجلة للتكبير · Esc للإغلاق",
+  "ui.document.close": "إغلاق"
 }

@@ -1,4 +1,9 @@
 {
   "ui.menu.continue": "Continue",
-  "ui.menu.new": "New Game"
+  "ui.menu.new": "New Game",
+  "prompt.inspect": "Inspect",
+  "prompt.pickup": "Take",
+  "prompt.read": "Read",
+  "ui.inspect.hint": "Drag to rotate · Wheel to zoom · Esc to close",
+  "ui.document.close": "Close"
 }

@@ -32,6 +32,12 @@ export interface HeroHooks {
   gameState?: () => 'menu' | 'playing' | 'paused';
   /** Surfaces of every footstep emitted so far. */
   steps?: () => string[];
+  /** Id of the interactable under the crosshair, or null. */
+  focusedId?: () => string | null;
+  inspectOpen?: () => boolean;
+  inventory?: () => string[];
+  /** Put the test cube's near face this many metres ahead of the camera (needs ?props=testcube). */
+  placeTestCube?: (distance: number) => void;
   [key: string]: unknown;
 }
 

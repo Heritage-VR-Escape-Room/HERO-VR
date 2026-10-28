@@ -18,7 +18,11 @@ export interface PointerLockDeps {
 }
 
 export class PointerLock {
-  private readonly onClick = (): void => this.request();
+  /** While true (inspect view, documents) losing the lock does not open the pause menu, and clicks do not relock. */
+  private suppressPause = false;
+  private readonly onClick = (): void => {
+    if (!this.suppressPause) this.request();
+  };
   private readonly onChange = (): void => this.sync();
   private readonly onError = (): void => console.warn('[pointer-lock] request refused');
   private readonly onMove = (e: MouseEvent): void => {
@@ -30,6 +34,10 @@ export class PointerLock {
     document.addEventListener('pointerlockchange', this.onChange);
     document.addEventListener('pointerlockerror', this.onError);
     document.addEventListener('mousemove', this.onMove);
+  }
+
+  setSuppressPause(on: boolean): void {
+    this.suppressPause = on;
   }
 
   isLocked(): boolean {
@@ -57,7 +65,7 @@ export class PointerLock {
       pause.close();
       state.set('playing');
       controller.setInputEnabled(true);
-    } else if (state.get() === 'playing') {
+    } else if (state.get() === 'playing' && !this.suppressPause) {
       pause.open();
       controller.setInputEnabled(false);
       clearInput();
