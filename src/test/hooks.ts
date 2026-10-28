@@ -17,6 +17,12 @@ export interface HeroHooks {
   fogDensity?: () => number;
   /** Fog tier actually in use (WebGL2 forces 'WebGL2Safe'). */
   fogQuality?: () => string;
+  /** Switch fog tier at runtime (exercises the post-chain rebuild). */
+  setFogQuality?: (q: 'WebGL2Safe' | 'Low' | 'Medium' | 'High' | 'Ultra') => void;
+  /** Depth of field focus in metres; null turns it off (rebuilds the chain). */
+  setDofFocus?: (m: number | null) => void;
+  /** Live GPU texture count (renderer.info.memory.textures). */
+  gpuTextures?: () => number;
   [key: string]: unknown;
 }
 

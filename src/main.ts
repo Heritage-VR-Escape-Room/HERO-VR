@@ -42,6 +42,9 @@ async function startFogTest(renderer: WebGPURenderer, params: URLSearchParams, b
     frames: () => frames,
     fogDensity: () => world.fog.density,
     fogQuality: () => world.fog.getQuality(),
+    setFogQuality: (q: FogQuality) => world.fog.setQuality(q),
+    setDofFocus: (m: number | null) => world.post.setDofFocus(m),
+    gpuTextures: () => renderer.info.memory.textures,
   });
 
   await renderer.setAnimationLoop((t: number) => {

@@ -38,6 +38,9 @@ import { ao } from 'three/addons/tsl/display/GTAONode.js';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { fxaa } from 'three/addons/tsl/display/FXAANode.js';
 import { smaa } from 'three/addons/tsl/display/SMAANode.js';
+// The runtime module only has a default export for the class; @types declares it as named.
+// @ts-expect-error -- default export exists at runtime
+import SMAANodeClass from 'three/addons/tsl/display/SMAANode.js';
 import { traa } from 'three/addons/tsl/display/TRAANode.js';
 import { fsr1 } from 'three/addons/tsl/display/FSR1Node.js';
 import { motionBlur } from 'three/addons/tsl/display/MotionBlur.js';
@@ -58,6 +61,38 @@ export const GRADE_SHADOWS = '#33445E';
 export const GRADE_HIGHLIGHTS = '#FFB65C';
 export const VIGNETTE = 0.28;
 export const FILM_GRAIN = 0.15;
+
+/** SMAA whose targets follow the scene resolution instead of the canvas. */
+class ScaledSMAANode extends (SMAANodeClass as N) {
+  constructor(
+    input: N,
+    private readonly scale: number,
+  ) {
+    super(input);
+  }
+  setSize(width: number, height: number): void {
+    super.setSize(Math.max(1, Math.floor(width * this.scale)), Math.max(1, Math.floor(height * this.scale)));
+  }
+}
+
+/** Disposes an effect node plus depth textures its own dispose() may leave behind. */
+function disposeNode(node: N): void {
+  node.dispose();
+  for (const v of Object.values(node) as N[]) {
+    if (v?.isRenderTarget) {
+      v.depthTexture?.dispose();
+      v.dispose();
+    } else if (v?.isTextureNode && v.value?.isDepthTexture) {
+      v.value.dispose();
+    }
+  }
+}
+
+/** Skip a node's per-frame passes while `active()` is false. */
+function gateUpdates(node: N, active: () => boolean): void {
+  const run = node.updateBefore.bind(node);
+  node.updateBefore = (frame: N) => (active() ? run(frame) : undefined);
+}
 
 export interface PostDeps {
   fog?: VolumetricFog;
@@ -103,19 +138,37 @@ export function buildPost(
   pipeline.outputColorTransform = false; // ACES + sRGB happen explicitly, before vignette and grain
   const cam = camera as PerspectiveCamera;
   const dofFocus = uniform(5);
+  const dofMix = uniform(0);
   let dofOn = false;
-  let disposables: { dispose(): void }[] = [];
+  const disposables: { dispose(): void }[] = [];
 
-  const build = (): void => {
-    for (const d of disposables) d.dispose();
-    disposables = [];
+  /**
+   * The graph is built once and never rebuilt. three caches compiled node graphs
+   * by structure, so a structurally identical rebuild can revive the disposed
+   * nodes of an earlier build (measured: old scene-pass targets re-allocated on
+   * every DOF toggle). Runtime switches (DOF, fog tier) are uniforms and gates.
+   */
+  const build = (): void => {    /** Every node that owns render targets is tracked, so rebuilds and dispose() free them. */
+    const own = (node: N): N => {
+      if (node && typeof node.dispose === 'function' && !disposables.includes(node)) disposables.push(node);
+      return node;
+    };
+    /** convertToTexture, but the RTT it may create is owned too. */
+    const tex = (node: N): N => {
+      const t: N = convertToTexture(node);
+      return t === node || t.isPassTextureNode ? t : own(t);
+    };
 
-    const scenePass = pass(scene, camera);
+    const scaled = opts.renderScale < 1;
+    // TRAA keeps full-res history and copies the scene depth into it, which breaks
+    // when the scene pass is scaled; below native resolution TAA becomes SMAA.
+    const aaMode = scaled && opts.aa === 'TAA' ? 'SMAA' : opts.aa;
+
+    const scenePass = own(pass(scene, camera));
     scenePass.name = 'Scene';
-    disposables.push(scenePass);
-    if (opts.renderScale < 1) scenePass.setResolutionScale(opts.renderScale);
+    if (scaled) scenePass.setResolutionScale(opts.renderScale);
     setClusterRenderScale(renderer, Math.min(1, opts.renderScale));
-    const needVelocity = opts.aa === 'TAA' || opts.motionBlur;
+    const needVelocity = aaMode === 'TAA' || opts.motionBlur;
     const targets: Record<string, N> = { output };
     if (opts.ssao) targets.normal = normalView;
     if (needVelocity) targets.velocity = velocity;
@@ -125,9 +178,8 @@ export function buildPost(
     let color: N = scenePass.getTextureNode('output');
 
     if (opts.ssao) {
-      const aoPass: N = ao(depth, scenePass.getTextureNode('normal'), cam);
+      const aoPass: N = own(ao(depth, scenePass.getTextureNode('normal'), cam));
       aoPass.resolutionScale = 0.5;
-      disposables.push(aoPass);
       const occlusion = aoPass.getTextureNode().sample(screenUV).r;
       color = vec4(color.rgb.mul(occlusion), color.a);
     }
@@ -135,23 +187,32 @@ export function buildPost(
     if (deps.fog) color = deps.fog.composite(color, depth);
     if (deps.highlight) color = vec4(color.rgb.add(deps.highlight.node), color.a);
 
-    const bloomPass: N = bloom(color, BLOOM.strength, BLOOM.radius, BLOOM.threshold);
-    disposables.push(bloomPass);
+    const bloomPass: N = own(bloom(color, BLOOM.strength, BLOOM.radius, BLOOM.threshold));
     color = color.add(bloomPass);
 
-    if (opts.aa === 'FXAA') color = fxaa(color);
-    else if (opts.aa === 'SMAA') color = smaa(color);
-    else if (opts.aa === 'TAA') color = traa(color, depth, scenePass.getTextureNode('velocity'), cam);
+    if (scaled) {
+      // Composite, bloom and AA all run at scene resolution; FSR 1 upscales the result.
+      const low = own(rtt(color, null, null, { resolutionScale: opts.renderScale }));
+      let aaOut: N = low;
+      if (aaMode === 'FXAA') {
+        aaOut = own(rtt(fxaa(low), null, null, { resolutionScale: opts.renderScale }));
+      } else if (aaMode === 'SMAA') {
+        const smaaNode: N = own(new ScaledSMAANode(low, opts.renderScale));
+        aaOut = smaaNode.getTextureNode();
+      }
+      color = own(fsr1(aaOut));
+    } else if (aaMode === 'FXAA') color = own(fxaa(tex(color)));
+    else if (aaMode === 'SMAA') color = own(smaa(tex(color)));
+    else if (aaMode === 'TAA') color = own(traa(tex(color), depth, scenePass.getTextureNode('velocity'), cam));
 
-    if (opts.renderScale < 1) {
-      color = fsr1(rtt(color, null, null, { resolutionScale: opts.renderScale }));
-    }
+    if (opts.motionBlur) color = motionBlur(tex(color), scenePass.getTextureNode('velocity').mul(0.5));
 
-    if (opts.motionBlur) color = motionBlur(convertToTexture(color), scenePass.getTextureNode('velocity').mul(0.5));
-
-    if (dofOn) {
-      color = dof(color, scenePass.getViewZNode(), dofFocus, 0.08, 1.5);
-    }
+    // DOF is always in the graph, but its passes (and its input copy) only run while on.
+    const dofInput = tex(color);
+    const dofNode: N = own(dof(dofInput, scenePass.getViewZNode(), dofFocus, 0.08, 1.5));
+    gateUpdates(dofNode, () => dofOn);
+    if (dofInput !== color) gateUpdates(dofInput, () => dofOn);
+    color = mix(color, dofNode, dofMix);
 
     color = colorGrade(color);
     color = renderOutput(color, ACESFilmicToneMapping, SRGBColorSpace);
@@ -163,7 +224,6 @@ export function buildPost(
   };
 
   build();
-  const offFog = deps.fog?.onGraphChange(build);
 
   return {
     render(): void {
@@ -171,17 +231,13 @@ export function buildPost(
       pipeline.render();
     },
     dispose(): void {
-      offFog?.();
-      for (const d of disposables) d.dispose();
+      for (const d of disposables) disposeNode(d);
       pipeline.dispose();
     },
     setDofFocus(m: number | null): void {
       if (m !== null) dofFocus.value = m;
-      const want = m !== null;
-      if (want !== dofOn) {
-        dofOn = want;
-        build();
-      }
+      dofOn = m !== null;
+      dofMix.value = dofOn ? 1 : 0;
     },
   };
 }

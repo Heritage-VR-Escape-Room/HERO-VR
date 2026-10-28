@@ -334,7 +334,8 @@ class FogResolveNode extends TempNode {
     private readonly input: N,
     private readonly depth: N,
     private readonly camera: PerspectiveCamera,
-    private readonly temporal: boolean,
+    /** Switching tiers flips this; the graph never changes shape. */
+    public temporal: boolean,
   ) {
     super('vec4');
     this.outTex = passTexture(this as N, this.curRT.texture);
@@ -486,7 +487,6 @@ export class VolumetricFog {
   private quality: FogQuality = 'High';
   private frame = 0;
   private resolveNode: FogResolveNode | null = null;
-  private readonly listeners = new Set<() => void>();
   private moon: DirectionalLight | null = null;
   /** Post-pass nodes run on a fullscreen quad, so they read the real camera by reference. */
   private readonly camNear: N;
@@ -548,22 +548,17 @@ export class VolumetricFog {
 
   setQuality(q: FogQuality): void {
     const p = fogParams(q);
-    const changedTemporal = fogParams(this.quality).temporal !== p.temporal;
     this.quality = q;
     this.inputs.steps.value = p.steps;
     this.fogPass.setResolutionScale(p.resolutionScale);
-    this.resolveNode?.reset();
-    if (changedTemporal) for (const l of this.listeners) l();
+    if (this.resolveNode) {
+      this.resolveNode.temporal = p.temporal;
+      this.resolveNode.reset();
+    }
   }
 
   getQuality(): FogQuality {
     return this.quality;
-  }
-
-  /** Post chain rebuilds its composite when the fog's graph shape changes. */
-  onGraphChange(fn: () => void): () => void {
-    this.listeners.add(fn);
-    return () => this.listeners.delete(fn);
   }
 
   /**
@@ -612,6 +607,5 @@ export class VolumetricFog {
     this.inputs.noise.dispose();
     this.resolveNode?.dispose();
     this.fogPass.dispose();
-    this.listeners.clear();
   }
 }
