@@ -38,6 +38,10 @@ export interface HeroHooks {
   inventory?: () => string[];
   /** Put the test cube's near face this many metres ahead of the camera (needs ?props=testcube). */
   placeTestCube?: (distance: number) => void;
+  /** Fire a story beat through the director; false if it already fired. */
+  fireBeat?: (id: string) => boolean;
+  storyState?: () => import('../logic/story').StoryState;
+  dialoguePlaying?: () => boolean;
   [key: string]: unknown;
 }
 

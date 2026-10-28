@@ -42,3 +42,6 @@ export function createInteractPrompt(i18n: I18n, keyLabel: () => string): Intera
 export function codeLabel(code: string): string {
   return code.replace(/^(Key|Digit)/, '');
 }
+
+/** Prompt keys the interactables use (prompt.read: documents, prompt.pickup: pickups). */
+export const USED_KEYS: readonly string[] = ['prompt.inspect', 'prompt.pickup', 'prompt.read'];

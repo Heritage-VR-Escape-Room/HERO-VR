@@ -11,6 +11,11 @@ import { createGameState } from './logic/gameState';
 import { isTestMode } from './test/hooks';
 import type { I18n } from './logic/i18n';
 import type { WebGPURenderer } from 'three/webgpu';
+import { createInventory, type Inventory } from './logic/inventory';
+import { createSaveService } from './logic/save';
+import { DialogueRunner } from './dialogue/runner';
+import { StoryDirector } from './dialogue/director';
+import { createSubtitles } from './ui/subtitles';
 
 type SettingsService = ReturnType<typeof createSettingsService>;
 
@@ -86,6 +91,7 @@ async function startFlat(
   backend: Backend,
   i18n: I18n,
   params: URLSearchParams,
+  inventory: Inventory,
 ): Promise<void> {
   const [
     { PhysicsWorld },
@@ -97,7 +103,6 @@ async function startFlat(
     { Interactor },
     { InspectView },
     { createModalSession },
-    { createInventory },
     { createInteractPrompt, codeLabel },
     { initDocumentView },
   ] = await Promise.all([
@@ -110,7 +115,6 @@ async function startFlat(
       import('./interaction/interactor'),
       import('./interaction/inspect'),
       import('./interaction/modal'),
-      import('./logic/inventory'),
       import('./ui/prompt'),
       import('./ui/documentView'),
     ]);
@@ -127,7 +131,6 @@ async function startFlat(
   const pointerLock = new PointerLock({ canvas, state, pause, controller, clearInput: () => keyboard.clear() });
 
   const modal = createModalSession({ pointerLock, controller, clearInput: () => keyboard.clear() });
-  const inventory = createInventory();
   const inspect = new InspectView({ renderer, camera: world.camera, post: world.post, modal, i18n, canvas });
   initDocumentView({ i18n, onOpenChange: (open) => (open ? modal.enter() : modal.exit()) });
   const interactor = new Interactor({
@@ -218,9 +221,21 @@ async function boot(): Promise<void> {
   installHooks({ backend });
   installI18nHooks(i18n);
 
+  // Dialogue and story state live for the whole session, whatever the scene.
+  const kv = localKV();
+  const settings = createSettingsService(kv);
+  const inventory = createInventory();
+  const runner = new DialogueRunner(i18n, createSubtitles(settings));
+  const director = new StoryDirector({ runner, save: createSaveService(kv), inventory });
+  installHooks({
+    fireBeat: (id: string) => director.fire(id),
+    storyState: () => structuredClone(director.state()),
+    dialoguePlaying: () => runner.isPlaying(),
+  });
+
   const scene = params.get('scene');
   if (scene === 'fogtest') await startFogTest(renderer, params, backend);
-  else if (scene === 'flat') await startFlat(renderer, canvas, createSettingsService(localKV()), backend, i18n, params);
+  else if (scene === 'flat') await startFlat(renderer, canvas, settings, backend, i18n, params, inventory);
 
   console.log(`HERO_READY backend=${backend}`);
 }

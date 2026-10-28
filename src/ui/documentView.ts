@@ -72,3 +72,5 @@ export function closeDocument(): void {
   root = null;
   deps?.onOpenChange?.(false);
 }
+
+export const USED_KEYS: readonly string[] = ['ui.document.close'];

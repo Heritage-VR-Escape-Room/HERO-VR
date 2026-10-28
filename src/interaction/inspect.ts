@@ -201,3 +201,5 @@ function overlayDiv(id: string, css: string): HTMLDivElement {
   document.body.appendChild(el);
   return el;
 }
+
+export const USED_KEYS: readonly string[] = ['ui.inspect.hint'];
