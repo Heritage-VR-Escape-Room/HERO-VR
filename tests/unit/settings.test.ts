@@ -33,6 +33,17 @@ describe('settings', () => {
     kv.set('som.settings.v1', JSON.stringify({ version: 0, locale: 'ar' }));
     expect(createSettingsService(kv).get()).toEqual(defaultSettings());
   });
+  it('malformed custom graphics -> defaults', () => {
+    for (const custom of [{}, { ...presetOptions('Low'), renderScale: 'x' }, { ...presetOptions('Low'), frameCap: 45 }, { ...presetOptions('Low'), renderScale: 2 }]) {
+      const kv = memoryKV();
+      kv.set('som.settings.v1', JSON.stringify({ ...defaultSettings(), locale: 'ar', custom }));
+      expect(createSettingsService(kv).get()).toEqual(defaultSettings());
+    }
+    const kv = memoryKV();
+    const ok = { ...presetOptions('Low'), frameCap: 0 };
+    kv.set('som.settings.v1', JSON.stringify({ ...defaultSettings(), custom: ok }));
+    expect(createSettingsService(kv).get().custom).toEqual(ok);
+  });
   it('presets table matches spec', () => {
     expect(presetOptions('Low')).toEqual({ renderScale: 0.67, shadows: 'Low', fog: 'Low', ssao: false, aa: 'FXAA', motionBlur: false, frameCap: 30 });
     expect(presetOptions('Medium')).toEqual({ renderScale: 0.85, shadows: 'Medium', fog: 'Medium', ssao: true, aa: 'SMAA', motionBlur: false, frameCap: 60 });

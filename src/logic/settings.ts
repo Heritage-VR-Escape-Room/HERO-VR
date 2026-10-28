@@ -2,6 +2,7 @@ import type { Locale } from './i18n';
 import { isLocale } from './i18n';
 import { DEFAULT_BINDINGS, type ActionName } from './bindings';
 import { presetOptions, GRAPHICS_PRESETS, type GraphicsOptions, type GraphicsPreset } from './presets';
+import { FOG_QUALITIES, type FogQuality } from './fogQuality';
 import type { KV } from './storage';
 
 export interface Settings {
@@ -41,6 +42,19 @@ export function defaultSettings(): Settings {
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
+function validGraphics(c: unknown): c is GraphicsOptions {
+  if (!isObj(c)) return false;
+  return (
+    num(c.renderScale) && c.renderScale > 0 && c.renderScale <= 1 &&
+    ['Off', 'Low', 'Medium', 'High'].includes(c.shadows as string) &&
+    FOG_QUALITIES.includes(c.fog as FogQuality) &&
+    typeof c.ssao === 'boolean' &&
+    ['Off', 'FXAA', 'SMAA', 'TAA'].includes(c.aa as string) &&
+    typeof c.motionBlur === 'boolean' &&
+    [30, 60, 0].includes(c.frameCap as number)
+  );
+}
+
 /** Returns a valid Settings, or null if the stored value is unusable. */
 function validate(o: unknown): Settings | null {
   if (!isObj(o) || o.version !== 1) return null;
@@ -57,7 +71,7 @@ function validate(o: unknown): Settings | null {
     if (typeof c !== 'string') return null;
     bindings[k] = c;
   }
-  if (o.custom !== null && !isObj(o.custom)) return null;
+  if (o.custom !== null && !validGraphics(o.custom)) return null;
   return {
     version: 1,
     locale: o.locale,
