@@ -3,7 +3,18 @@ import { installHooks, installI18nHooks } from './test/hooks';
 import { createI18n, isLocale, loadTables } from './logic/i18n';
 import { isFogQuality, type FogQuality } from './logic/fogQuality';
 import type { GraphicsOptions } from './logic/presets';
+import { createSettingsService } from './logic/settings';
+import { localKV } from './logic/storage';
+import { shouldRender } from './logic/frameCap';
+import { createFixedStep } from './logic/fixedStep';
+import { createGameState } from './logic/gameState';
+import { isTestMode } from './test/hooks';
 import type { WebGPURenderer } from 'three/webgpu';
+
+type SettingsService = ReturnType<typeof createSettingsService>;
+
+const PHYSICS_HZ = 60;
+const MAX_SUBSTEPS = 5;
 
 /** Graphics used by the fogtest scene until Task 4's presets exist. */
 function fogtestOptions(params: URLSearchParams, backend: Backend): GraphicsOptions {
@@ -57,6 +68,85 @@ async function startFogTest(renderer: WebGPURenderer, params: URLSearchParams, b
   });
 }
 
+/** The player's graphics settings; WebGL2 always runs the cheapest fog tier. */
+function effectiveGraphics(settings: SettingsService, backend: Backend): GraphicsOptions {
+  const g = settings.effectiveGraphics();
+  return backend === 'webgl2' ? { ...g, fog: 'WebGL2Safe' } : g;
+}
+
+/**
+ * `?scene=flat`: the game loop on a flat cobble ground. Physics steps at a
+ * fixed 60 Hz; gameplay updates every tick; rendering is gated by the cap.
+ */
+async function startFlat(
+  renderer: WebGPURenderer,
+  canvas: HTMLCanvasElement,
+  settings: SettingsService,
+  backend: Backend,
+): Promise<void> {
+  const [{ PhysicsWorld }, { createFlatWorld }, { PlayerController }, { KeyboardInput }, { PointerLock }, { createPauseStub }] =
+    await Promise.all([
+      import('./world/colliders'),
+      import('./world/flat'),
+      import('./player/controller'),
+      import('./player/input'),
+      import('./player/pointerLock'),
+      import('./ui/pause'),
+    ]);
+  const physics = await PhysicsWorld.create();
+  const world = await createFlatWorld(renderer, physics, effectiveGraphics(settings, backend));
+  const keyboard = new KeyboardInput(window, () => settings.get().bindings);
+  const controller = new PlayerController(physics, world.camera, {
+    input: () => keyboard.move(),
+    look: () => settings.get(),
+  });
+  controller.teleport(world.spawn, world.spawnYaw);
+  const state = createGameState('menu');
+  const pause = createPauseStub();
+  new PointerLock({ canvas, state, pause, controller, clearInput: () => keyboard.clear() });
+
+  // The post chain is built once; only the frame cap follows settings live.
+  let frameCap = effectiveGraphics(settings, backend).frameCap;
+  settings.onChange(() => (frameCap = effectiveGraphics(settings, backend).frameCap));
+
+  window.addEventListener('resize', () => {
+    world.camera.aspect = window.innerWidth / window.innerHeight;
+    world.camera.updateProjectionMatrix();
+  });
+
+  let frames = 0;
+  const steps: string[] = [];
+  if (isTestMode()) controller.footsteps.onStep((s) => steps.push(s));
+  installHooks({
+    frames: () => frames,
+    fogDensity: () => world.fog.density,
+    fogQuality: () => world.fog.getQuality(),
+    playerPos: () => ({ ...controller.position }),
+    playerYaw: () => controller.yawDeg,
+    pauseOpen: () => pause.isOpen(),
+    gameState: () => state.get(),
+    steps: () => [...steps],
+  });
+
+  const fixed = createFixedStep(PHYSICS_HZ, MAX_SUBSTEPS);
+  let lastTick: number | null = null;
+  let lastRender = 0;
+  await renderer.setAnimationLoop((t: number) => {
+    const dt = lastTick === null ? 0 : (t - lastTick) / 1000;
+    lastTick = t;
+    const alpha = fixed.advance(dt, (h) => {
+      controller.fixedUpdate(h);
+      physics.step(h);
+    });
+    controller.update(dt, alpha);
+    if (!shouldRender(t, lastRender, frameCap)) return;
+    lastRender = t;
+    world.rig.update(world.camera.position);
+    world.post.render();
+    frames++;
+  });
+}
+
 async function boot(): Promise<void> {
   const canvas = document.getElementById('game') as HTMLCanvasElement;
   const params = new URLSearchParams(location.search);
@@ -81,7 +171,9 @@ async function boot(): Promise<void> {
   installHooks({ backend });
   installI18nHooks(i18n);
 
-  if (params.get('scene') === 'fogtest') await startFogTest(renderer, params, backend);
+  const scene = params.get('scene');
+  if (scene === 'fogtest') await startFogTest(renderer, params, backend);
+  else if (scene === 'flat') await startFlat(renderer, canvas, createSettingsService(localKV()), backend);
 
   console.log(`HERO_READY backend=${backend}`);
 }

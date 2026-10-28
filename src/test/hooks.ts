@@ -23,6 +23,15 @@ export interface HeroHooks {
   setDofFocus?: (m: number | null) => void;
   /** Live GPU texture count (renderer.info.memory.textures). */
   gpuTextures?: () => number;
+  /** Player feet position in metres (scene=flat and later worlds). */
+  playerPos?: () => { x: number; y: number; z: number };
+  /** Player view bearing in degrees, clockwise from north (+Z). */
+  playerYaw?: () => number;
+  /** Whether the pause menu (stub until Task 10) is open. */
+  pauseOpen?: () => boolean;
+  gameState?: () => 'menu' | 'playing' | 'paused';
+  /** Surfaces of every footstep emitted so far. */
+  steps?: () => string[];
   [key: string]: unknown;
 }
 

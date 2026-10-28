@@ -32,13 +32,13 @@ export interface FogTestWorld {
   post: PostChain;
 }
 
-const LAMP_HEAD_Y = 4.2;
+export const LAMP_HEAD_Y = 4.2;
 
 function rigQuality(opts: GraphicsOptions): RigQuality {
   return opts.shadows;
 }
 
-function addStreetlampMesh(scene: Scene, x: number, z: number, mats: { metal: MeshStandardMaterial; glass: MeshStandardMaterial }): void {
+export function addStreetlampMesh(scene: Scene, x: number, z: number, mats: { metal: MeshStandardMaterial; glass: MeshStandardMaterial }): void {
   const pole = new Mesh(new CylinderGeometry(0.06, 0.09, LAMP_HEAD_Y, 10), mats.metal);
   pole.position.set(x, LAMP_HEAD_Y / 2, z);
   const cap = new Mesh(new CylinderGeometry(0.08, 0.28, 0.22, 12), mats.metal);
