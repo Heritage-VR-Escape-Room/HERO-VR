@@ -11,6 +11,12 @@ export interface HeroHooks {
   /** Draw an i18n key onto a visible fixed debug canvas (redraws on locale change). */
   debugCanvasText?: (key: string) => Promise<void>;
   setLocale?: (l: Locale) => void;
+  /** Frames rendered by the main loop so far. */
+  frames?: () => number;
+  /** Current fog extinction density (must never change at runtime). */
+  fogDensity?: () => number;
+  /** Fog tier actually in use (WebGL2 forces 'WebGL2Safe'). */
+  fogQuality?: () => string;
   [key: string]: unknown;
 }
 

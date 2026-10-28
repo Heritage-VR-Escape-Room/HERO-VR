@@ -1,0 +1,7 @@
+Kloppenheim 07 (Pure Sky) - kloppenheim_07_puresky_1k.hdr
+Source: https://polyhaven.com/a/kloppenheim_07_puresky
+Authors: Greg Zaal (original), Jarod Guest (sky edits)
+License: CC0 1.0 Universal (public domain dedication)
+         https://creativecommons.org/publicdomain/zero/1.0/
+Downloaded 2026-10-29 via api.polyhaven.com (1k .hdr, md5 63a735ad768ed8564fa19a19368ae2f4).
+Placeholder night sky for Shadows of the Mist until the Task 11 asset manifest replaces it.
