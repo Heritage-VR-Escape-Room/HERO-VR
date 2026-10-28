@@ -19,3 +19,18 @@ export interface GraphicsOptions {
   /** 0 = unlimited. */
   frameCap: FrameCap;
 }
+
+export type GraphicsPreset = 'Low' | 'Medium' | 'High' | 'Ultra';
+
+export const GRAPHICS_PRESETS: readonly GraphicsPreset[] = ['Low', 'Medium', 'High', 'Ultra'];
+
+const TABLE: Record<GraphicsPreset, GraphicsOptions> = {
+  Low: { renderScale: 0.67, shadows: 'Low', fog: 'Low', ssao: false, aa: 'FXAA', motionBlur: false, frameCap: 30 },
+  Medium: { renderScale: 0.85, shadows: 'Medium', fog: 'Medium', ssao: true, aa: 'SMAA', motionBlur: false, frameCap: 60 },
+  High: { renderScale: 1.0, shadows: 'High', fog: 'High', ssao: true, aa: 'TAA', motionBlur: false, frameCap: 60 },
+  Ultra: { renderScale: 1.0, shadows: 'High', fog: 'Ultra', ssao: true, aa: 'TAA', motionBlur: true, frameCap: 0 },
+};
+
+export function presetOptions(p: GraphicsPreset): GraphicsOptions {
+  return { ...TABLE[p] };
+}
