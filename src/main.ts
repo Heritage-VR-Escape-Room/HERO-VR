@@ -92,6 +92,7 @@ async function startFlat(
   i18n: I18n,
   params: URLSearchParams,
   inventory: Inventory,
+  director: StoryDirector,
 ): Promise<void> {
   const [
     { PhysicsWorld },
@@ -148,6 +149,20 @@ async function startFlat(
     testCube = createTestCube(world.scene, physics, (mesh) => inspect.open(mesh));
     interactor.register(testCube.interactable);
   }
+  let lock: import('./puzzles/cipherLock').CipherLock | undefined;
+  if (params.get('props') === 'lock') {
+    const { createLockProp } = await import('./world/lockProp');
+    lock = createLockProp(world.scene, physics, world.spawn, world.spawnYaw, {
+      director,
+      modal,
+      camera: world.camera,
+      canvas,
+      target: window,
+      bindings: () => settings.get().bindings,
+      i18n,
+    });
+    interactor.register(lock.interactable);
+  }
 
   // The post chain is built once; only the frame cap follows settings live.
   let frameCap = effectiveGraphics(settings, backend).frameCap;
@@ -174,6 +189,13 @@ async function startFlat(
     inspectOpen: () => inspect.isOpen(),
     inventory: () => [...inventory.items()],
     placeTestCube: (d: number) => testCube?.place(world.camera, d),
+    lockTumblerPoints: () => lock?.tumblerScreenPoints() ?? [],
+    lock: lock && {
+      rotate: (n: number) => lock.rotate(n),
+      setTumblers: (s: string) => lock.setTumblers(s),
+      pull: () => lock.pull(),
+      state: () => lock.state(),
+    },
   });
 
   const fixed = createFixedStep(PHYSICS_HZ, MAX_SUBSTEPS);
@@ -187,6 +209,7 @@ async function startFlat(
       physics.step(h);
     });
     controller.update(dt, alpha);
+    lock?.update(dt);
     interactor.update();
     if (!shouldRender(t, lastRender, frameCap)) return;
     lastRender = t;
@@ -235,7 +258,7 @@ async function boot(): Promise<void> {
 
   const scene = params.get('scene');
   if (scene === 'fogtest') await startFogTest(renderer, params, backend);
-  else if (scene === 'flat') await startFlat(renderer, canvas, settings, backend, i18n, params, inventory);
+  else if (scene === 'flat') await startFlat(renderer, canvas, settings, backend, i18n, params, inventory, director);
 
   console.log(`HERO_READY backend=${backend}`);
 }

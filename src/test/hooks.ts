@@ -38,6 +38,15 @@ export interface HeroHooks {
   inventory?: () => string[];
   /** Put the test cube's near face this many metres ahead of the camera (needs ?props=testcube). */
   placeTestCube?: (distance: number) => void;
+  /** The cipher-disc lock (needs ?props=lock). */
+  lock?: {
+    rotate(steps: number): void;
+    setTumblers(letters: string): void;
+    pull(): void;
+    state(): import('../puzzles/cipherLock').LockState;
+  };
+  /** Client-pixel position of each lock tumbler, with a point in its top and bottom half. */
+  lockTumblerPoints?: () => Array<{ x: number; top: number; bottom: number }>;
   /** Fire a story beat through the director; false if it already fired. */
   fireBeat?: (id: string) => boolean;
   storyState?: () => import('../logic/story').StoryState;
