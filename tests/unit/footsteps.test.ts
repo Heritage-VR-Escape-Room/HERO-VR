@@ -36,6 +36,20 @@ describe('Footsteps', () => {
     expect(n).toBe(1);
   });
 
+  it('a per-point surface (terrain) wins over the collider tag', async () => {
+    const p = await PhysicsWorld.create();
+    p.addStaticBox({ x: 0, y: -0.5, z: 0 }, { x: 10, y: 0.5, z: 10 }, 0, {
+      surface: 'grass',
+      surfaceAt: (pt) => (pt.x > 0 ? 'cobble' : 'gravel'),
+    });
+    const f = new Footsteps(p);
+    const got: string[] = [];
+    f.onStep((s) => got.push(s));
+    f.update(0.55, false, { x: 3, y: 0, z: 0 });
+    f.update(0.55, false, { x: -3, y: 0, z: 0 });
+    expect(got).toEqual(['cobble', 'gravel']);
+  });
+
   it('no surface tag means no step sound', async () => {
     const p = await PhysicsWorld.create();
     p.addStaticBox({ x: 0, y: -0.5, z: 0 }, { x: 5, y: 0.5, z: 5 }, 0);

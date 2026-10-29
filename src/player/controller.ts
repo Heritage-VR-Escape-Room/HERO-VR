@@ -121,8 +121,8 @@ export class PlayerController {
     this.inputEnabled = on;
   }
 
-  /** Place the feet at `pos`, facing bearing `yawDeg`, level gaze. */
-  teleport(pos: Vec3Like, yawDeg: number): void {
+  /** Place the feet at `pos`, facing bearing `yawDeg`, with gaze pitch `pitchDeg` (level by default). */
+  teleport(pos: Vec3Like, yawDeg: number, pitchDeg = 0): void {
     // Start just clear of the floor: a capsule spawned exactly touching it can be pushed through.
     const y = pos.y + TELEPORT_CLEARANCE;
     this.body.setTranslation({ x: pos.x, y: y + this.centerY, z: pos.z }, true);
@@ -130,7 +130,7 @@ export class PlayerController {
     this.feet = { x: pos.x, y, z: pos.z };
     this.prevFeet = { ...this.feet };
     this.yaw = yawDeg;
-    this.pitch = 0;
+    this.pitch = pitchDeg;
     this.vy = 0;
   }
 

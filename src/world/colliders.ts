@@ -15,6 +15,8 @@ export type Surface = 'cobble' | 'gravel' | 'grass' | 'wood' | 'metal';
 
 export interface ColliderData {
   surface?: Surface;
+  /** Per-point surface for colliders that span several materials (the terrain); wins over `surface`. */
+  surfaceAt?: (point: Vec3Like) => Surface;
   [key: string]: unknown;
 }
 
@@ -77,6 +79,12 @@ export class PhysicsWorld {
     const desc = RAPIER.ColliderDesc.cuboid(halfExtents.x, halfExtents.y, halfExtents.z)
       .setTranslation(center.x, center.y, center.z)
       .setRotation({ x: q.x, y: q.y, z: q.z, w: q.w });
+    return this.addStatic(desc, opts);
+  }
+
+  /** Upright cylinder centred on `center`. */
+  addStaticCylinder(center: Vec3Like, halfHeight: number, radius: number, opts: StaticOptions = {}): RAPIER.Collider {
+    const desc = RAPIER.ColliderDesc.cylinder(halfHeight, radius).setTranslation(center.x, center.y, center.z);
     return this.addStatic(desc, opts);
   }
 

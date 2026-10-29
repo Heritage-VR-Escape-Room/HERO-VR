@@ -35,6 +35,7 @@ export class Footsteps {
 
   private surfaceAt(feet: Vec3Like): Surface | undefined {
     const origin = { x: feet.x, y: feet.y + PROBE_UP, z: feet.z };
-    return this.physics.raycast(origin, { x: 0, y: -1, z: 0 }, PROBE_UP + PROBE_DOWN, GROUPS.WORLD)?.data.surface;
+    const hit = this.physics.raycast(origin, { x: 0, y: -1, z: 0 }, PROBE_UP + PROBE_DOWN, GROUPS.WORLD);
+    return hit ? (hit.data.surfaceAt?.(hit.point) ?? hit.data.surface) : undefined;
   }
 }

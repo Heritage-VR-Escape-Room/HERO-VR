@@ -1,0 +1,28 @@
+{
+  "spawn": { "position": [0, 0, -150], "yaw": 0 },
+  "viewpoints": {
+    "aerial": { "position": [0, 400, 20], "lookAt": [0, 0, 20], "up": [0, 0, 1], "fov": 100, "fogBypass": true }
+  },
+  "schloss": { "model": null, "position": [0, 0, 0], "facing": 180 },
+  "fountain": { "position": [-40, 0, 220] },
+  "trees": {
+    "seed": 1715,
+    "density": 0.7,
+    "rings": [120, 430],
+    "spacing": 11,
+    "jitter": 3.5,
+    "species": [
+      { "slug": "tree_linden", "share": 0.4 },
+      { "slug": "tree_chestnut", "share": 0.6 }
+    ],
+    "scaleRange": [0.85, 1.15],
+    "lod1Ratio": 0.15,
+    "detail": {
+      "Off": { "lod0": 25, "lod1": 100, "shadows": false },
+      "Low": { "lod0": 25, "lod1": 100, "shadows": false },
+      "Medium": { "lod0": 35, "lod1": 150, "shadows": true },
+      "High": { "lod0": 50, "lod1": 150, "shadows": true }
+    }
+  },
+  "blockers": { "radius": 1, "spacing": 1.2, "height": 4, "triggerMargin": 0.5, "pushBack": 2, "barkCooldownSec": 8 }
+}

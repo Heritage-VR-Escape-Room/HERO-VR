@@ -121,11 +121,14 @@ function effectiveGraphics(settings: SettingsService, backend: Backend): Graphic
   return backend === 'webgl2' ? { ...g, fog: 'WebGL2Safe' } : g;
 }
 
+type GameScene = 'flat' | 'garden';
+
 /**
- * `?scene=flat`: the game loop on a flat cobble ground. Physics steps at a
- * fixed 60 Hz; gameplay updates every tick; rendering is gated by the cap.
+ * The game loop on a world: `?scene=flat` (a flat cobble ground) or
+ * `?scene=garden` (the Schlossgarten). Physics steps at a fixed 60 Hz;
+ * gameplay updates every tick; rendering is gated by the cap.
  */
-async function startFlat(session: Session): Promise<void> {
+async function startGame(session: Session, sceneName: GameScene): Promise<void> {
   const { renderer, canvas, settings, backend, i18n, params, inventory, director, runner, meter } = session;
   const [
     { PhysicsWorld },
@@ -155,7 +158,15 @@ async function startFlat(session: Session): Promise<void> {
       import('./ui/endCard'),
     ]);
   const physics = await PhysicsWorld.create();
-  const world = await createFlatWorld(renderer, physics, effectiveGraphics(settings, backend));
+  const garden =
+    sceneName === 'garden'
+      ? await (await import('./world/gardenWorld')).createGardenWorld(renderer, physics, effectiveGraphics(settings, backend), {
+          now: () => performance.now() / 1000,
+          // A bark never cuts into a story line.
+          bark: () => void (runner.isPlaying() || director.say('fritz_notyet')),
+        })
+      : null;
+  const world = garden ?? (await createFlatWorld(renderer, physics, effectiveGraphics(settings, backend)));
   const keyboard = new KeyboardInput(window, () => settings.get().bindings);
   const controller = new PlayerController(physics, world.camera, {
     input: () => keyboard.move(),
@@ -274,6 +285,7 @@ async function startFlat(session: Session): Promise<void> {
     const g = effectiveGraphics(settings, backend);
     frameCap = g.frameCap;
     applyGraphics(world, g);
+    garden?.applyDetail(g);
   });
 
   window.addEventListener('resize', () => {
@@ -311,6 +323,15 @@ async function startFlat(session: Session): Promise<void> {
       highlighted: () => fritz.highlightedObjects().map((o) => o.name),
       caws: () => cawCount,
     },
+    teleport: (x: number, z: number, yaw: number) => controller.teleport({ x, y: garden?.groundHeight(x, z) ?? 0, z }, yaw),
+    viewpoint: (name: string | null) => garden?.setViewpoint(name) ?? false,
+    cameraPose: () => {
+      const dir = world.camera.getWorldDirection(new Vector3());
+      const p = world.camera.position;
+      return { x: p.x, y: p.y, z: p.z, lookX: dir.x, lookY: dir.y, lookZ: dir.z };
+    },
+    fogDebugBypass: () => world.fog.debugBypass(),
+    treeStats: () => garden?.garden.stats() ?? null,
     lock: lock && {
       rotate: (n: number) => lock.rotate(n),
       setTumblers: (s: string) => lock.setTumblers(s),
@@ -328,8 +349,11 @@ async function startFlat(session: Session): Promise<void> {
     const alpha = fixed.advance(dt, (h) => {
       controller.fixedUpdate(h);
       physics.step(h);
+      const back = garden?.boundary.check(controller.position);
+      if (back) controller.teleport({ ...back, y: garden!.groundHeight(back.x, back.z) }, controller.yawDeg, controller.pitchDeg);
     });
     controller.update(dt, alpha);
+    garden?.update(); // debug viewpoint override and tree LOD, every tick so a capped frame never shows the player camera
     lock?.update(dt);
     if (lockHint) {
       const p = lock!.parts.root.position;
@@ -387,7 +411,7 @@ async function startMenu(session: Session): Promise<void> {
     backdrop.dispose();
     const data = restore ? save.load() : null;
     if (data) director.restore(data);
-    await startFlat(session);
+    await startGame(session, 'flat');
   };
   const menu = createMainMenu({
     i18n,
@@ -483,7 +507,7 @@ async function boot(): Promise<void> {
 
   const scene = params.get('scene');
   if (scene === 'fogtest') await startFogTest(renderer, params, backend);
-  else if (scene === 'flat') await startFlat(session);
+  else if (scene === 'flat' || scene === 'garden') await startGame(session, scene);
   else await startMenu(session);
 
   console.log(`HERO_READY backend=${backend}`);

@@ -500,6 +500,8 @@ export class VolumetricFog {
   private frame = 0;
   private resolveNode: FogResolveNode | null = null;
   private moon: DirectionalLight | null = null;
+  /** Debug-only switch (aerial view): composite passes the scene through. Density is untouched. */
+  private readonly bypass = uniform(0);
   /** Post-pass nodes run on a fullscreen quad, so they read the real camera by reference. */
   private readonly camNear: N;
   private readonly camFar: N;
@@ -588,8 +590,22 @@ export class VolumetricFog {
     return Fn(() => {
       const base = sceneColor.toVar();
       const fog = bilateralUpsample(fogTex, sceneDepth, screenUV, this.camNear, this.camFar);
-      return vec4(base.rgb.mul(fog.a).add(fog.rgb), base.a);
+      const fogged = vec4(base.rgb.mul(fog.a).add(fog.rgb), base.a);
+      return mix(fogged, base, this.bypass);
     })();
+  }
+
+  /**
+   * Debug views only (e.g. the 400 m aerial, far above the fog volume): show
+   * the scene without fog. The fog's density is not touched.
+   */
+  setDebugBypass(on: boolean): void {
+    this.bypass.value = on ? 1 : 0;
+    this.mesh.visible = !on; // the fog pass then draws nothing
+  }
+
+  debugBypass(): boolean {
+    return this.bypass.value === 1;
   }
 
   /** Per-frame update (before rendering): volume position, temporal jitter, moon. */

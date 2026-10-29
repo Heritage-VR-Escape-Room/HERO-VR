@@ -74,6 +74,16 @@ export interface HeroHooks {
   menuOpen?: () => boolean;
   /** Show the end-of-slice card (game scenes). */
   showEndCard?: () => void;
+  /** Put the player's feet on the ground at (x, z), facing bearing `yaw`. */
+  teleport?: (x: number, z: number, yaw: number) => void;
+  /** Override the camera with a named debug viewpoint (scene=garden: 'aerial'); null gives it back to the player. */
+  viewpoint?: (name: string | null) => boolean;
+  /** Camera position and unit view direction. */
+  cameraPose?: () => { x: number; y: number; z: number; lookX: number; lookY: number; lookZ: number };
+  /** Whether a debug view is bypassing the fog (the density never changes). */
+  fogDebugBypass?: () => boolean;
+  /** Trees drawn per LOD last frame (scene=garden). */
+  treeStats?: () => { lod0: number; lod1: number; impostor: number } | null;
   /** Load a model through src/world/assets.ts and describe it (clips, bone names, triangle count, bounds). */
   loadModelInfo?: (slug: string) => Promise<{
     clips: string[];
