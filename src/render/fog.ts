@@ -297,6 +297,14 @@ class FogLightingModel extends LightingModel {
 }
 
 class FogVolumeMaterial extends VolumeNodeMaterial {
+  /**
+   * Bumped whenever the lighting model's inputs change shape (a new scene
+   * depth node). The model is not a material property, so without this a
+   * recompile would hit three's structural program cache and keep the old
+   * graph, which keeps the old scene pass alive.
+   */
+  revision = 0;
+
   constructor(private readonly model: FogLightingModel) {
     super();
     this.transparent = true;
@@ -307,6 +315,10 @@ class FogVolumeMaterial extends VolumeNodeMaterial {
   }
   override setupLightingModel(): N {
     return this.model;
+  }
+
+  override customProgramCacheKey(): string {
+    return `${super.customProgramCacheKey()}|fog-${this.revision}`;
   }
 }
 
@@ -568,6 +580,7 @@ export class VolumetricFog {
    */
   composite(sceneColor: N, sceneDepth: N): N {
     this.inputs.depth.node = sceneDepth.sample(screenUV).r;
+    this.material.revision++;
     this.material.needsUpdate = true;
     this.resolveNode?.dispose();
     this.resolveNode = new FogResolveNode(this.fogPass.getTextureNode(), sceneDepth, this.camera, fogParams(this.quality).temporal);

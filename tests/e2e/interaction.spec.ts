@@ -16,6 +16,7 @@ async function open(page: Page): Promise<string[]> {
 }
 
 async function lock(page: Page): Promise<void> {
+  await page.bringToFront(); // Chrome refuses pointer lock while its window is not in front
   await page.mouse.click(960, 540);
   await page.waitForFunction(() => window.__hero!.gameState!() === 'playing', undefined, { timeout: 10_000 });
 }

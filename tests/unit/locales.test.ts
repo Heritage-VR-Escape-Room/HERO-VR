@@ -4,15 +4,20 @@ import ar from '../../public/locales/ar.json';
 import de from '../../public/locales/de.json';
 import { BEATS, USED_KEYS as DIALOGUE_KEYS } from '../../src/dialogue/beats';
 import { USED_KEYS as ITEM_KEYS } from '../../src/logic/inventory';
-import { USED_KEYS as PROMPT_KEYS } from '../../src/ui/prompt';
+import { USED_KEYS as PROMPT_KEYS } from '../../src/ui/hud';
 import { USED_KEYS as DOC_KEYS } from '../../src/ui/documentView';
 import { USED_KEYS as INSPECT_KEYS } from '../../src/interaction/inspect';
 import { USED_KEYS as LOCK_KEYS } from '../../src/puzzles/cipherLock';
+import { USED_KEYS as MENU_KEYS } from '../../src/ui/menu';
+import { USED_KEYS as PAUSE_KEYS } from '../../src/ui/pause';
+import { USED_KEYS as SETTINGS_KEYS } from '../../src/ui/settingsScreen';
+import { USED_KEYS as CREDITS_KEYS } from '../../src/ui/credits';
+import { USED_KEYS as END_KEYS } from '../../src/ui/endCard';
 
 const tables: Record<string, Record<string, string>> = { en, ar, de };
 
 const beatKeys = Object.values(BEATS).flatMap((lines) => lines.flatMap((l) => [l.speaker, l.text]));
-const used = [...new Set([...beatKeys, ...DIALOGUE_KEYS, ...ITEM_KEYS, ...PROMPT_KEYS, ...DOC_KEYS, ...INSPECT_KEYS, ...LOCK_KEYS])];
+const used = [...new Set([...beatKeys, ...DIALOGUE_KEYS, ...ITEM_KEYS, ...PROMPT_KEYS, ...DOC_KEYS, ...INSPECT_KEYS, ...LOCK_KEYS, ...MENU_KEYS, ...PAUSE_KEYS, ...SETTINGS_KEYS, ...CREDITS_KEYS, ...END_KEYS])];
 
 describe('locales', () => {
   it('every key used in BEATS, hints, docs, items and ui exists in en, ar and de with non-empty values', () => {

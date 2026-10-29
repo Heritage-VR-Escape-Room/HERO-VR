@@ -66,6 +66,14 @@ export interface HeroHooks {
   };
   /** Press the hint action as if the key were pressed. */
   requestHint?: () => void;
+  /** A copy of the current settings. */
+  settings?: () => import('../logic/settings').Settings;
+  /** Rendered frames per second over the last 3 s. */
+  renderFps?: () => number;
+  /** Whether the main menu (or a screen opened from it) is showing. */
+  menuOpen?: () => boolean;
+  /** Show the end-of-slice card (game scenes). */
+  showEndCard?: () => void;
   [key: string]: unknown;
 }
 

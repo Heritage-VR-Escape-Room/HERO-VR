@@ -24,7 +24,10 @@ export class PointerLock {
     if (!this.suppressPause) this.request();
   };
   private readonly onChange = (): void => this.sync();
-  private readonly onError = (): void => console.warn('[pointer-lock] request refused');
+  private readonly onError = (): void => {
+    console.warn('[pointer-lock] request refused');
+    this.deps.pause.lockRefused();
+  };
   private readonly onMove = (e: MouseEvent): void => {
     if (this.isLocked()) this.deps.controller.look(e.movementX, e.movementY);
   };
@@ -44,7 +47,7 @@ export class PointerLock {
     return document.pointerLockElement === this.deps.canvas;
   }
 
-  /** Must run inside a user gesture (the canvas click handler). */
+  /** Must run inside a user gesture (the canvas click, the pause menu's Resume). */
   request(): void {
     if (this.isLocked()) return;
     // Chrome returns a promise that rejects if the request is refused (e.g. too soon after an exit).

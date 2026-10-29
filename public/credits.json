@@ -1,0 +1,37 @@
+{
+  "entries": [
+    {
+      "asset": "Kloppenheim 07 (Pure Sky) HDRI, night sky placeholder",
+      "author": "Greg Zaal (original), Jarod Guest (sky edits)",
+      "license": "CC0 1.0",
+      "source": "https://polyhaven.com/a/kloppenheim_07_puresky"
+    },
+    {
+      "asset": "IM Fell English (UI headings)",
+      "author": "Igino Marini (Fell Types revival)",
+      "license": "SIL Open Font License 1.1",
+      "source": "https://fontsource.org/fonts/im-fell-english"
+    },
+    {
+      "asset": "Amiri (Arabic headings, plaque)",
+      "author": "The Amiri Project Authors (Khaled Hosny)",
+      "license": "SIL Open Font License 1.1",
+      "source": "https://github.com/aliftype/amiri"
+    },
+    {
+      "asset": "Noto Sans (UI body text)",
+      "author": "The Noto Project Authors",
+      "license": "SIL Open Font License 1.1",
+      "source": "https://github.com/notofonts/latin-greek-cyrillic"
+    },
+    {
+      "asset": "Noto Naskh Arabic (Arabic body text)",
+      "author": "The Noto Project Authors",
+      "license": "SIL Open Font License 1.1",
+      "source": "https://github.com/notofonts/arabic"
+    }
+  ],
+  "notes": [
+    "Fritz (companion raven) is a built-in low-poly placeholder for now; no third-party asset."
+  ]
+}

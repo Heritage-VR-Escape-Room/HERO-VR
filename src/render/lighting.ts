@@ -57,13 +57,22 @@ export interface Lamp {
 }
 
 export interface LightingRig {
+  /** The current moon. setQuality replaces it, so read it each time. */
   readonly moon: DirectionalLight;
   readonly lamps: readonly Lamp[];
   addStreetlamp(head: Vector3): Lamp;
   /** Shadows only on the n lamps nearest the pyramid. */
   setLampShadows(n: number): void;
+  /**
+   * Change shadow quality at runtime: rebuilds the moon (map size, CSM) and the
+   * lamp shadow count. Returns true when the light set changed, so the fog
+   * must re-collect its lights (VolumetricFog.syncLights).
+   */
+  setQuality(q: RigQuality): boolean;
+  getQuality(): RigQuality;
   /** Keep the moon's single shadow map centred on the viewer. */
   update(viewer: Vector3): void;
+  /** Removes every light and gives the renderer back its previous lighting and shadow setting. */
   dispose(): void;
 }
 
@@ -110,39 +119,55 @@ const SINGLE_MAP_HALF_EXTENT = 40;
 
 export function createLightingRig(scene: Scene, renderer: WebGPURenderer, quality: RigQuality): LightingRig {
   const isWebGPU = (renderer.backend as unknown as { isWebGPUBackend?: boolean }).isWebGPUBackend === true;
+  const prevLighting = renderer.lighting;
+  const prevShadows = renderer.shadowMap.enabled;
   // Forward+ clustering needs compute + storage buffers: WebGPU only.
   if (isWebGPU) renderer.lighting = new ScaledClusteredLighting();
 
-  renderer.shadowMap.enabled = quality !== 'Off';
-
   const moonDir = bearingDirection(MOON_AZIMUTH_DEG, MOON_ELEVATION_DEG);
-  const moon = new DirectionalLight(MOON_COLOR, MOON_INTENSITY);
-  moon.name = 'Moon';
-  moon.position.copy(moonDir).multiplyScalar(100);
-  scene.add(moon, moon.target);
-
+  let moon!: DirectionalLight;
   let csm: CSMShadowNode | null = null;
-  if (quality !== 'Off') {
-    moon.castShadow = true;
-    const cam = moon.shadow.camera;
-    if (quality === 'High' || quality === 'Ultra') {
-      moon.shadow.mapSize.set(2048, 2048);
-      cam.near = 1;
-      cam.far = 400;
-      csm = new CSMShadowNode(moon, { cascades: 3, maxFar: 150, mode: 'practical', lightMargin: 60 });
-      moon.shadow.shadowNode = csm;
-    } else {
-      const size = quality === 'Medium' ? 2048 : 1024;
-      moon.shadow.mapSize.set(size, size);
-      cam.left = cam.bottom = -SINGLE_MAP_HALF_EXTENT;
-      cam.right = cam.top = SINGLE_MAP_HALF_EXTENT;
-      cam.near = 1;
-      cam.far = 250;
-      cam.updateProjectionMatrix();
+
+  /** A fresh moon configured for `quality` (shadow map size, CSM or a single map). */
+  const buildMoon = (): void => {
+    moon = new DirectionalLight(MOON_COLOR, MOON_INTENSITY);
+    moon.name = 'Moon';
+    moon.position.copy(moonDir).multiplyScalar(100);
+    csm = null;
+    if (quality !== 'Off') {
+      moon.castShadow = true;
+      const cam = moon.shadow.camera;
+      if (quality === 'High' || quality === 'Ultra') {
+        moon.shadow.mapSize.set(2048, 2048);
+        cam.near = 1;
+        cam.far = 400;
+        csm = new CSMShadowNode(moon, { cascades: 3, maxFar: 150, mode: 'practical', lightMargin: 60 });
+        moon.shadow.shadowNode = csm;
+      } else {
+        const size = quality === 'Medium' ? 2048 : 1024;
+        moon.shadow.mapSize.set(size, size);
+        cam.left = cam.bottom = -SINGLE_MAP_HALF_EXTENT;
+        cam.right = cam.top = SINGLE_MAP_HALF_EXTENT;
+        cam.near = 1;
+        cam.far = 250;
+        cam.updateProjectionMatrix();
+      }
+      moon.shadow.bias = -0.0005;
+      moon.shadow.normalBias = 0.02;
     }
-    moon.shadow.bias = -0.0005;
-    moon.shadow.normalBias = 0.02;
-  }
+    scene.add(moon, moon.target);
+  };
+  const disposeMoon = (): void => {
+    scene.remove(moon, moon.target);
+    // CSMShadowNode.dispose leaves its per-cascade shadow nodes (and their maps) alive.
+    for (const n of (csm as unknown as { _shadowNodes?: { dispose(): void }[] } | null)?._shadowNodes ?? []) n.dispose();
+    csm?.dispose();
+    csm = null;
+    moon.dispose(); // also frees the shadow map its light node owns
+  };
+
+  renderer.shadowMap.enabled = quality !== 'Off';
+  buildMoon();
 
   const lamps: Lamp[] = [];
   let lampShadowCount = LAMP_SHADOWS[quality];
@@ -160,7 +185,9 @@ export function createLightingRig(scene: Scene, renderer: WebGPURenderer, qualit
   };
 
   const rig: LightingRig = {
-    moon,
+    get moon() {
+      return moon;
+    },
     lamps,
     addStreetlamp(head: Vector3): Lamp {
       const spot = new SpotLight(LAMP_COLOR);
@@ -192,6 +219,17 @@ export function createLightingRig(scene: Scene, renderer: WebGPURenderer, qualit
       lampShadowCount = Math.max(0, Math.floor(n));
       applyLampShadows();
     },
+    setQuality(q: RigQuality): boolean {
+      if (q === quality) return false;
+      quality = q;
+      disposeMoon();
+      renderer.shadowMap.enabled = q !== 'Off';
+      buildMoon();
+      lampShadowCount = LAMP_SHADOWS[q];
+      applyLampShadows();
+      return true;
+    },
+    getQuality: () => quality,
     update(viewer: Vector3): void {
       if (csm || quality === 'Off') return;
       // Snap to shadow texels so the single map doesn't shimmer as the viewer moves.
@@ -202,14 +240,15 @@ export function createLightingRig(scene: Scene, renderer: WebGPURenderer, qualit
       moon.position.copy(moonDir).multiplyScalar(100).add(moon.target.position);
     },
     dispose(): void {
-      scene.remove(moon, moon.target, root);
-      csm?.dispose();
-      moon.dispose();
+      disposeMoon();
+      scene.remove(root);
       for (const l of lamps) {
         l.spot.dispose();
         l.halo.dispose();
       }
       lamps.length = 0;
+      renderer.lighting = prevLighting;
+      renderer.shadowMap.enabled = prevShadows;
     },
   };
   return rig;

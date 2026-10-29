@@ -236,4 +236,46 @@ describe('dialogue runner', () => {
       vi.useRealTimers();
     }
   });
+
+  it('pause holds the current line; resume continues with the time left', () => {
+    vi.useFakeTimers();
+    try {
+      const i18n = createI18n(tables, 'en');
+      const out = sink();
+      const r = new DialogueRunner(i18n, out);
+      const done = vi.fn();
+      r.play([{ speaker: 'spk.a', text: 'l.1', duration: 3 }], done);
+      vi.advanceTimersByTime(1000);
+      r.pause();
+      r.pause(); // idempotent
+      vi.advanceTimersByTime(60_000);
+      expect(r.isPlaying()).toBe(true);
+      expect(done).not.toHaveBeenCalled();
+      r.resume();
+      vi.advanceTimersByTime(1999);
+      expect(done).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1);
+      expect(done).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a line started while paused waits for resume', () => {
+    vi.useFakeTimers();
+    try {
+      const i18n = createI18n(tables, 'en');
+      const r = new DialogueRunner(i18n, sink());
+      const done = vi.fn();
+      r.pause();
+      r.play([{ speaker: 'spk.a', text: 'l.1', duration: 1 }], done);
+      vi.advanceTimersByTime(10_000);
+      expect(done).not.toHaveBeenCalled();
+      r.resume();
+      vi.advanceTimersByTime(1000);
+      expect(done).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

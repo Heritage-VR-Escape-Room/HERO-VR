@@ -32,6 +32,10 @@ export class DialogueRunner {
   private index = -1;
   private onDone: (() => void) | undefined;
   private timer: ReturnType<typeof setTimeout> | undefined;
+  private paused = false;
+  /** Milliseconds the current line still has on screen. */
+  private remainingMs = 0;
+  private startedAt = 0;
 
   constructor(
     private readonly i18n: I18n,
@@ -55,6 +59,23 @@ export class DialogueRunner {
     return this.index >= 0 && this.index < this.lines.length;
   }
 
+  /** Freeze line timing (game paused); the line stays on screen. */
+  pause(): void {
+    if (this.paused) return;
+    this.paused = true;
+    if (this.timer !== undefined) {
+      this.remainingMs = Math.max(0, this.remainingMs - (Date.now() - this.startedAt));
+      this.stopTimer();
+    }
+  }
+
+  /** Continue the current line with the time it had left. */
+  resume(): void {
+    if (!this.paused) return;
+    this.paused = false;
+    if (this.isPlaying()) this.startTimer();
+  }
+
   /** Cut the current line short and move on. */
   skip(): void {
     if (this.isPlaying()) this.next();
@@ -75,8 +96,14 @@ export class DialogueRunner {
     }
     const resolved = this.resolve(line);
     this.sink.show(resolved);
-    const seconds = line.duration ?? durationFor(resolved.text);
-    this.timer = setTimeout(() => this.next(), seconds * 1000);
+    this.remainingMs = (line.duration ?? durationFor(resolved.text)) * 1000;
+    if (!this.paused) this.startTimer();
+  }
+
+  private startTimer(): void {
+    this.stopTimer();
+    this.startedAt = Date.now();
+    this.timer = setTimeout(() => this.next(), this.remainingMs);
   }
 
   private stopTimer(): void {

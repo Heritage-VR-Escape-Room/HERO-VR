@@ -1,7 +1,7 @@
 /**
- * Subtitle panel: speaker name plus line, plain DOM inside #ui (Task 10
- * restyles). Logical CSS properties only, so RTL needs nothing extra. The
- * panel follows the subtitles on/off and size settings live.
+ * Subtitle panel: speaker name plus line inside #ui, styled by styles.css
+ * (logical properties only, so RTL needs nothing extra). The panel follows the
+ * subtitles on/off and size settings live.
  */
 import type { Settings } from '../logic/settings';
 import type { ResolvedLine, SubtitleSink } from '../dialogue/runner';
@@ -28,13 +28,9 @@ export function uiRoot(): HTMLElement {
 export function createSubtitles(settings: SubtitleSettings): SubtitleSink {
   const panel = document.createElement('div');
   panel.id = 'subtitle';
-  panel.style.cssText =
-    'position:absolute;inset-inline:0;inset-block-end:9vh;margin-inline:auto;inline-size:fit-content;max-inline-size:min(70ch,80vw);' +
-    'padding-block:0.45em;padding-inline:0.9em;border-radius:6px;background:rgba(18,16,14,0.82);color:#f2efe6;' +
-    'font-family:"Noto Sans","Noto Naskh Arabic",sans-serif;line-height:1.4;text-align:center;display:none';
+  panel.style.display = 'none';
   const speaker = document.createElement('div');
   speaker.id = 'subtitle-speaker';
-  speaker.style.cssText = 'font-size:0.72em;font-weight:700;letter-spacing:0.04em;color:#d9b36c;margin-block-end:0.15em';
   const text = document.createElement('div');
   text.id = 'subtitle-text';
   panel.append(speaker, text);

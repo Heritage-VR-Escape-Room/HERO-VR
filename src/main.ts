@@ -1,3 +1,5 @@
+import './render/fonts';
+import './ui/styles.css';
 import { createRenderer, type Backend } from './render/renderer';
 import { installHooks, installI18nHooks } from './test/hooks';
 import { createI18n, isLocale, loadTables } from './logic/i18n';
@@ -16,8 +18,46 @@ import { createSaveService } from './logic/save';
 import { DialogueRunner } from './dialogue/runner';
 import { StoryDirector } from './dialogue/director';
 import { createSubtitles } from './ui/subtitles';
+import { createFpsMeter } from './logic/fpsMeter';
+import { applyGraphics } from './render/liveGraphics';
+import { createSettingsScreen, type SettingsScreen } from './ui/settingsScreen';
+import { createCredits } from './ui/credits';
+import { codeLabel } from './ui/dom';
 
 type SettingsService = ReturnType<typeof createSettingsService>;
+type SaveService = ReturnType<typeof createSaveService>;
+
+/** Everything that lives for the whole page, whichever scene runs. */
+interface Session {
+  renderer: WebGPURenderer;
+  canvas: HTMLCanvasElement;
+  backend: Backend;
+  i18n: I18n;
+  params: URLSearchParams;
+  settings: SettingsService;
+  save: SaveService;
+  inventory: Inventory;
+  director: StoryDirector;
+  runner: DialogueRunner;
+  settingsScreen: SettingsScreen;
+  /** Rendered frames per second over the last 3 s (any scene). */
+  meter: ReturnType<typeof createFpsMeter>;
+}
+
+/**
+ * Back to the main menu by reloading without the scene: the game world has no
+ * full teardown yet, and a reload frees everything. Test, language and
+ * backend flags survive.
+ */
+function goToMainMenu(params: URLSearchParams): void {
+  const keep = new URLSearchParams();
+  for (const k of ['test', 'lang', 'forceWebGL']) {
+    const v = params.get(k);
+    if (v !== null) keep.set(k, v);
+  }
+  const q = keep.toString();
+  location.assign(`${location.pathname}${q ? `?${q}` : ''}`);
+}
 
 const PHYSICS_HZ = 60;
 const MAX_SUBSTEPS = 5;
@@ -84,29 +124,21 @@ function effectiveGraphics(settings: SettingsService, backend: Backend): Graphic
  * `?scene=flat`: the game loop on a flat cobble ground. Physics steps at a
  * fixed 60 Hz; gameplay updates every tick; rendering is gated by the cap.
  */
-async function startFlat(
-  renderer: WebGPURenderer,
-  canvas: HTMLCanvasElement,
-  settings: SettingsService,
-  backend: Backend,
-  i18n: I18n,
-  params: URLSearchParams,
-  inventory: Inventory,
-  director: StoryDirector,
-  runner: DialogueRunner,
-): Promise<void> {
+async function startFlat(session: Session): Promise<void> {
+  const { renderer, canvas, settings, backend, i18n, params, inventory, director, runner, meter } = session;
   const [
     { PhysicsWorld },
     { createFlatWorld },
     { PlayerController },
     { KeyboardInput },
     { PointerLock },
-    { createPauseStub },
+    { createPauseMenu },
     { Interactor },
     { InspectView },
     { createModalSession },
-    { createInteractPrompt, codeLabel },
+    { createHud },
     { initDocumentView },
+    { createEndCard },
   ] = await Promise.all([
       import('./world/colliders'),
       import('./world/flat'),
@@ -117,8 +149,9 @@ async function startFlat(
       import('./interaction/interactor'),
       import('./interaction/inspect'),
       import('./interaction/modal'),
-      import('./ui/prompt'),
+      import('./ui/hud'),
       import('./ui/documentView'),
+      import('./ui/endCard'),
     ]);
   const physics = await PhysicsWorld.create();
   const world = await createFlatWorld(renderer, physics, effectiveGraphics(settings, backend));
@@ -129,8 +162,16 @@ async function startFlat(
   });
   controller.teleport(world.spawn, world.spawnYaw);
   const state = createGameState('menu');
-  const pause = createPauseStub();
+  const toMenu = (): void => goToMainMenu(params);
+  const pause = createPauseMenu({
+    i18n,
+    onResume: () => pointerLock.request(),
+    onSettings: () => session.settingsScreen.open(),
+    onMainMenu: toMenu,
+  });
   const pointerLock = new PointerLock({ canvas, state, pause, controller, clearInput: () => keyboard.clear() });
+  // Dialogue timing stops with the game.
+  state.onChange((s) => (s === 'paused' ? runner.pause() : runner.resume()));
 
   const modal = createModalSession({ pointerLock, controller, clearInput: () => keyboard.clear() });
   const inspect = new InspectView({ renderer, camera: world.camera, post: world.post, modal, i18n, canvas });
@@ -142,8 +183,13 @@ async function startFlat(
     bindings: () => settings.get().bindings,
     enabled: () => state.get() === 'playing' && !modal.isActive(),
   });
-  const prompt = createInteractPrompt(i18n, () => codeLabel(settings.get().bindings.interact));
-  interactor.onFocusChange((i) => prompt.show(i?.promptKey ?? null));
+  const hud = createHud(i18n, () => codeLabel(settings.get().bindings.interact));
+  interactor.onFocusChange((i) => hud.showPrompt(i?.promptKey ?? null));
+  const endCard = createEndCard(i18n, toMenu);
+  const showEndCard = (): void => {
+    modal.enter();
+    endCard.show();
+  };
   const props = new Set((params.get('props') ?? '').split(',').filter(Boolean));
   let testCube: import('./world/testCube').TestCube | undefined;
   if (props.has('testcube')) {
@@ -221,9 +267,13 @@ async function startFlat(
     requestHint();
   });
 
-  // The post chain is built once; only the frame cap follows settings live.
+  // Graphics follow the settings live; each part rebuilds only when its own options change.
   let frameCap = effectiveGraphics(settings, backend).frameCap;
-  settings.onChange(() => (frameCap = effectiveGraphics(settings, backend).frameCap));
+  settings.onChange(() => {
+    const g = effectiveGraphics(settings, backend);
+    frameCap = g.frameCap;
+    applyGraphics(world, g);
+  });
 
   window.addEventListener('resize', () => {
     world.camera.aspect = window.innerWidth / window.innerHeight;
@@ -241,6 +291,9 @@ async function startFlat(
     playerYaw: () => controller.yawDeg,
     pauseOpen: () => pause.isOpen(),
     gameState: () => state.get(),
+    renderFps: () => meter.fps(),
+    gpuTextures: () => renderer.info.memory.textures,
+    showEndCard,
     steps: () => [...steps],
     focusedId: () => interactor.focused()?.id ?? null,
     inspectOpen: () => inspect.isOpen(),
@@ -284,12 +337,84 @@ async function startFlat(
     }
     fritz.update(dt);
     interactor.update();
+    const st = state.get();
+    hud.setMode(endCard.isOpen() ? 'hidden' : st === 'playing' && !modal.isActive() ? 'playing' : st === 'menu' ? 'click-to-play' : 'hidden');
     if (!shouldRender(t, lastRender, frameCap)) return;
     lastRender = t;
     world.rig.update(world.camera.position);
     world.post.render();
     inspect.render();
     frames++;
+    meter.tick(t);
+  });
+}
+
+/**
+ * The main menu over the orbiting backdrop. New Game and Continue tear the
+ * backdrop down and start the game world (`flat` until Task 16 wires Act 0).
+ */
+async function startMenu(session: Session): Promise<void> {
+  const { renderer, settings, backend, i18n, save, director, meter } = session;
+  const [{ createMenuBackdrop }, { createMainMenu, createAutoPick }] = await Promise.all([
+    import('./render/menuBackdrop'),
+    import('./ui/menu'),
+  ]);
+  const backdrop = await createMenuBackdrop(renderer, effectiveGraphics(settings, backend));
+  const { world } = backdrop;
+  const autoPick = createAutoPick(settings);
+
+  let frameCap = effectiveGraphics(settings, backend).frameCap;
+  const unsubSettings = settings.onChange(() => {
+    const g = effectiveGraphics(settings, backend);
+    frameCap = g.frameCap;
+    applyGraphics(world, g);
+  });
+  const resize = (): void => {
+    world.camera.aspect = window.innerWidth / window.innerHeight;
+    world.camera.updateProjectionMatrix();
+  };
+  window.addEventListener('resize', resize);
+
+  let leaving = false;
+  const enterGame = async (restore: boolean): Promise<void> => {
+    if (leaving) return;
+    leaving = true;
+    menu.hide();
+    await renderer.setAnimationLoop(null);
+    unsubSettings();
+    window.removeEventListener('resize', resize);
+    backdrop.dispose();
+    const data = restore ? save.load() : null;
+    if (data) director.restore(data);
+    await startFlat(session);
+  };
+  const menu = createMainMenu({
+    i18n,
+    save,
+    settingsScreen: session.settingsScreen,
+    credits: createCredits(i18n),
+    onContinue: () => void enterGame(true),
+    onNewGame: () => void enterGame(false),
+  });
+  menu.show();
+
+  let frames = 0;
+  let lastRender = 0;
+  installHooks({
+    frames: () => frames,
+    fogQuality: () => world.fog.getQuality(),
+    gpuTextures: () => renderer.info.memory.textures,
+    renderFps: () => meter.fps(),
+    menuOpen: () => menu.isOpen(),
+  });
+  await renderer.setAnimationLoop((t: number) => {
+    // The first-launch benchmark measures uncapped; afterwards the cap applies.
+    if (!autoPick.running() && !shouldRender(t, lastRender, frameCap)) return;
+    lastRender = t;
+    backdrop.render(t / 1000);
+    frames++;
+    meter.tick(t);
+    autoPick.tick(t);
   });
 }
 
@@ -297,14 +422,23 @@ async function boot(): Promise<void> {
   const canvas = document.getElementById('game') as HTMLCanvasElement;
   const params = new URLSearchParams(location.search);
   const forceWebGL = params.has('forceWebGL') && params.get('forceWebGL') !== '0';
+  const kv = localKV();
+  const settings = createSettingsService(kv);
+  // ?lang= overrides the saved language for this page only.
   const langParam = params.get('lang');
-  const i18n = createI18n(await loadTables(), isLocale(langParam) ? langParam : 'en');
+  const i18n = createI18n(await loadTables(), isLocale(langParam) ? langParam : settings.get().locale);
   const applyDocumentLocale = (): void => {
     document.documentElement.lang = i18n.locale();
     document.documentElement.dir = i18n.dir();
   };
   applyDocumentLocale();
   i18n.onChange(applyDocumentLocale);
+  let lastLocale = settings.get().locale;
+  settings.onChange((s) => {
+    if (s.locale === lastLocale) return;
+    lastLocale = s.locale;
+    i18n.setLocale(s.locale);
+  });
   const { renderer, backend } = await createRenderer(canvas, {
     forceWebGL,
     trackTimestamp: false,
@@ -318,20 +452,36 @@ async function boot(): Promise<void> {
   installI18nHooks(i18n);
 
   // Dialogue and story state live for the whole session, whatever the scene.
-  const kv = localKV();
-  const settings = createSettingsService(kv);
+  const save = createSaveService(kv);
   const inventory = createInventory();
   const runner = new DialogueRunner(i18n, createSubtitles(settings));
-  const director = new StoryDirector({ runner, save: createSaveService(kv), inventory });
+  const director = new StoryDirector({ runner, save, inventory });
   installHooks({
     fireBeat: (id: string) => director.fire(id),
     storyState: () => structuredClone(director.state()),
     dialoguePlaying: () => runner.isPlaying(),
+    settings: () => structuredClone(settings.get()),
   });
+
+  const session: Session = {
+    renderer,
+    canvas,
+    backend,
+    i18n,
+    params,
+    settings,
+    save,
+    inventory,
+    director,
+    runner,
+    settingsScreen: createSettingsScreen({ i18n, settings, backend }),
+    meter: createFpsMeter(3000),
+  };
 
   const scene = params.get('scene');
   if (scene === 'fogtest') await startFogTest(renderer, params, backend);
-  else if (scene === 'flat') await startFlat(renderer, canvas, settings, backend, i18n, params, inventory, director, runner);
+  else if (scene === 'flat') await startFlat(session);
+  else await startMenu(session);
 
   console.log(`HERO_READY backend=${backend}`);
 }

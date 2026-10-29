@@ -82,6 +82,9 @@ function disposeNode(node: N): void {
     if (v?.isRenderTarget) {
       v.depthTexture?.dispose();
       v.dispose();
+      // A target that was sampled but never rendered to (gated DOF) is not known to
+      // the renderer as a target, so only disposing its textures frees them.
+      for (const t of v.textures as N[]) t.dispose();
     } else if (v?.isTextureNode && v.value?.isDepthTexture) {
       v.value.dispose();
     }
@@ -104,6 +107,17 @@ export interface PostChain {
   dispose(): void;
   /** Focus distance in metres; null turns depth of field off. */
   setDofFocus(m: number | null): void;
+  /**
+   * Apply new graphics options. Options that change the graph's shape
+   * (render scale, AA, SSAO, motion blur) rebuild the chain; others are no-ops here.
+   * Returns true when it rebuilt.
+   */
+  setOptions(opts: GraphicsOptions): boolean;
+}
+
+/** The options that decide the post graph's shape. */
+function structureKey(o: GraphicsOptions): string {
+  return `${o.renderScale}|${o.aa}|${o.ssao}|${o.motionBlur}`;
 }
 
 /** A tint scaled to unit luminance, so grading shifts hue without changing exposure. */
@@ -134,8 +148,7 @@ export function buildPost(
   opts: GraphicsOptions,
   deps: PostDeps = {},
 ): PostChain {
-  const pipeline = new RenderPipeline(renderer);
-  pipeline.outputColorTransform = false; // ACES + sRGB happen explicitly, before vignette and grain
+  let pipeline!: RenderPipeline;
   const cam = camera as PerspectiveCamera;
   const dofFocus = uniform(5);
   const dofMix = uniform(0);
@@ -143,12 +156,19 @@ export function buildPost(
   const disposables: { dispose(): void }[] = [];
 
   /**
-   * The graph is built once and never rebuilt. three caches compiled node graphs
-   * by structure, so a structurally identical rebuild can revive the disposed
-   * nodes of an earlier build (measured: old scene-pass targets re-allocated on
-   * every DOF toggle). Runtime switches (DOF, fog tier) are uniforms and gates.
+   * Runtime switches (DOF, fog tier) are uniforms and gates, never rebuilds.
+   * three caches compiled node graphs by structure, so a structurally identical
+   * rebuild that keeps the old pipeline can revive the disposed nodes of an
+   * earlier build (measured: old scene-pass targets re-allocated on every DOF
+   * toggle). A structural options change (setOptions) therefore disposes every
+   * node and the pipeline and builds fresh ones; the fog material bumps its
+   * program key on composite() so it cannot keep the old scene depth (and with
+   * it the old scene pass). tests/e2e/menu.spec.ts checks the texture count.
    */
-  const build = (): void => {    /** Every node that owns render targets is tracked, so rebuilds and dispose() free them. */
+  const build = (opts: GraphicsOptions): void => {
+    pipeline = new RenderPipeline(renderer);
+    pipeline.outputColorTransform = false; // ACES + sRGB happen explicitly, before vignette and grain
+    /** Every node that owns render targets is tracked, so rebuilds and dispose() free them. */
     const own = (node: N): N => {
       if (node && typeof node.dispose === 'function' && !disposables.includes(node)) disposables.push(node);
       return node;
@@ -203,7 +223,12 @@ export function buildPost(
       color = own(fsr1(aaOut));
     } else if (aaMode === 'FXAA') color = own(fxaa(tex(color)));
     else if (aaMode === 'SMAA') color = own(smaa(tex(color)));
-    else if (aaMode === 'TAA') color = own(traa(tex(color), depth, scenePass.getTextureNode('velocity'), cam));
+    else if (aaMode === 'TAA') {
+      color = own(traa(tex(color), depth, scenePass.getTextureNode('velocity'), cam));
+      // TRAA swaps its 1x1 placeholder depth texture for the history depth without disposing it.
+      const placeholder: N = color._previousDepthNode.value;
+      own({ dispose: () => placeholder.dispose() });
+    }
 
     if (opts.motionBlur) color = motionBlur(tex(color), scenePass.getTextureNode('velocity').mul(0.5));
 
@@ -223,16 +248,27 @@ export function buildPost(
     pipeline.needsUpdate = true;
   };
 
-  build();
+  let key = structureKey(opts);
+  build(opts);
+  const disposeAll = (): void => {
+    for (const d of disposables) disposeNode(d);
+    disposables.length = 0;
+    pipeline.dispose();
+  };
 
   return {
     render(): void {
       deps.fog?.update();
       pipeline.render();
     },
-    dispose(): void {
-      for (const d of disposables) disposeNode(d);
-      pipeline.dispose();
+    dispose: disposeAll,
+    setOptions(next: GraphicsOptions): boolean {
+      const k = structureKey(next);
+      if (k === key) return false;
+      key = k;
+      disposeAll();
+      build(next);
+      return true;
     },
     setDofFocus(m: number | null): void {
       if (m !== null) dofFocus.value = m;
