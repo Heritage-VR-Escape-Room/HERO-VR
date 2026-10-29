@@ -242,6 +242,36 @@ test('pause → click Resume → playing', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+test('refused re-lock keeps pause open with a note; the next Resume click plays', async ({ page }) => {
+  const errors = collectErrors(page);
+  await page.goto('/?test=1&scene=flat');
+  await page.waitForFunction(() => (window.__hero?.frames?.() ?? 0) > 60, undefined, { timeout: 60_000 });
+  await lockPointer(page);
+  await page.evaluate(() => document.exitPointerLock());
+  await expect(page.locator('#pause')).toBeVisible();
+  await expect(page.locator('.pause-note')).toBeHidden();
+  // Chrome's post-Esc cooldown, simulated: the next request rejects and fires pointerlockerror.
+  await page.evaluate(() => {
+    const proto = HTMLCanvasElement.prototype;
+    const real = proto.requestPointerLock;
+    proto.requestPointerLock = function (this: HTMLCanvasElement) {
+      proto.requestPointerLock = real;
+      document.dispatchEvent(new Event('pointerlockerror'));
+      return Promise.reject(new DOMException('refused', 'SecurityError'));
+    } as typeof real;
+  });
+  await page.click('#pause-resume');
+  await expect(page.locator('.pause-note')).toBeVisible();
+  await expect(page.locator('#pause')).toBeVisible();
+  expect(await page.evaluate(() => window.__hero!.gameState!())).toBe('paused');
+  // One more click, no retry: the real request goes through.
+  await page.bringToFront();
+  await page.click('#pause-resume');
+  await page.waitForFunction(() => window.__hero!.gameState!() === 'playing', undefined, { timeout: 5_000 });
+  await expect(page.locator('#pause')).toBeHidden();
+  expect(errors).toEqual([]);
+});
+
 test('subtitles hold while paused', async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto('/?test=1&scene=flat');
