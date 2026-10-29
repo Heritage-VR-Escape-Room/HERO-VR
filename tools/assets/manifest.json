@@ -1,0 +1,338 @@
+{
+  "entries": [
+    {
+      "slot": "pyramid",
+      "kind": "model",
+      "source": "code",
+      "id": "built-in",
+      "slug": "pyramid",
+      "title": "Pyramid (built in code)",
+      "author": "n/a",
+      "license": "n/a",
+      "url": "n/a",
+      "targetSize": {
+        "axis": "height",
+        "meters": 6.8
+      }
+    },
+    {
+      "slot": "pyramid_fallback",
+      "kind": "model",
+      "source": "sketchfab",
+      "id": "b47c6d297832428faee5c28a874949b7",
+      "slug": "pyramid_fallback",
+      "targetSize": {
+        "axis": "height",
+        "meters": 6.8
+      },
+      "title": "Pyramid",
+      "author": "quedlin",
+      "license": "CC-BY 4.0",
+      "url": "https://sketchfab.com/3d-models/pyramid-b47c6d297832428faee5c28a874949b7",
+      "faces": 464
+    },
+    {
+      "slot": "schloss",
+      "kind": "model",
+      "source": "code",
+      "id": "built-in",
+      "slug": "schloss",
+      "title": "Schloss (blockout built in code)",
+      "author": "n/a",
+      "license": "n/a",
+      "url": "n/a",
+      "targetSize": {
+        "axis": "length",
+        "meters": 170
+      }
+    },
+    {
+      "slot": "streetlamp",
+      "kind": "model",
+      "source": "sketchfab",
+      "id": "dea5920f66814e04a66fa87b338e0e8d",
+      "slug": "streetlamp",
+      "targetSize": {
+        "axis": "height",
+        "meters": 4.5
+      },
+      "maxTris": 15000,
+      "pickedBy": "substitute",
+      "title": "Classic Street Lamp Post",
+      "author": "sacapuntas",
+      "license": "CC-BY 4.0",
+      "url": "https://sketchfab.com/3d-models/classic-street-lamp-post-dea5920f66814e04a66fa87b338e0e8d",
+      "faces": 11064
+    },
+    {
+      "slot": "bench",
+      "kind": "model",
+      "source": "sketchfab",
+      "id": "84426d6537ac4cdc837d602ccabe7036",
+      "slug": "bench",
+      "targetSize": {
+        "axis": "length",
+        "meters": 1.8
+      },
+      "maxTris": 30000,
+      "title": "Park Bench",
+      "author": "DutraBR98",
+      "license": "CC-BY 4.0",
+      "url": "https://sketchfab.com/3d-models/park-bench-84426d6537ac4cdc837d602ccabe7036",
+      "faces": 101612,
+      "fix": {
+        "yaw": 180
+      }
+    },
+    {
+      "slot": "kiosk",
+      "kind": "model",
+      "source": "sketchfab",
+      "id": "3b85ae768ecd43f394991a1f0027c72c",
+      "slug": "kiosk",
+      "targetSize": {
+        "axis": "height",
+        "meters": 3.2
+      },
+      "title": "Soviet Kiosk – 3D Model",
+      "author": "dimmeyster",
+      "license": "CC-BY 4.0",
+      "url": "https://sketchfab.com/3d-models/soviet-kiosk-3d-model-3b85ae768ecd43f394991a1f0027c72c",
+      "faces": 19167
+    },
+    {
+      "slot": "newspapers",
+      "kind": "model",
+      "source": "sketchfab",
+      "id": "c4311a0b918643af97904e10c7a34efc",
+      "slug": "newspapers",
+      "targetSize": {
+        "axis": "length",
+        "meters": 0.4
+      },
+      "title": "[CC0] Newspaper Stack - Ready to Unity HDRP",
+      "author": "karlwirbelwind",
+      "license": "CC-BY 4.0",
+      "url": "https://sketchfab.com/3d-models/cc0-newspaper-stack-ready-to-unity-hdrp-c4311a0b918643af97904e10c7a34efc",
+      "faces": 2132
+    },
+    {
+      "slot": "tree_plane",
+      "kind": "model",
+      "source": "alias",
+      "id": "tree_linden",
+      "slug": "tree_plane",
+      "title": "Plane tree stand-in (uses tree_linden)",
+      "author": "n/a",
+      "license": "n/a",
+      "url": "n/a",
+      "targetSize": {
+        "axis": "height",
+        "meters": 22
+      }
+    },
+    {
+      "slot": "tree_linden",
+      "kind": "model",
+      "source": "sketchfab",
+      "id": "b497c5f3f26344c29f27f53dc2ca74f4",
+      "slug": "tree_linden",
+      "targetSize": {
+        "axis": "height",
+        "meters": 18
+      },
+      "maxTris": 40000,
+      "title": "4 Linden Trees Pack (medium-Poly)",
+      "author": "Sereib",
+      "license": "CC-BY 4.0",
+      "url": "https://sketchfab.com/3d-models/4-linden-trees-pack-medium-poly-b497c5f3f26344c29f27f53dc2ca74f4",
+      "faces": 139971,
+      "fix": {
+        "keep": "^Object_2$"
+      }
+    },
+    {
+      "slot": "tree_chestnut",
+      "kind": "model",
+      "source": "sketchfab",
+      "id": "b5d2833c258f4054a01ee2b4ef85adf0",
+      "slug": "tree_chestnut",
+      "targetSize": {
+        "axis": "height",
+        "meters": 16
+      },
+      "maxTris": 40000,
+      "title": "Maple trees pack (lowpoly, game ready, LODs)",
+      "author": "LOLIPOP",
+      "license": "CC-BY 4.0",
+      "url": "https://sketchfab.com/3d-models/maple-trees-pack-lowpoly-game-ready-lods-b5d2833c258f4054a01ee2b4ef85adf0",
+      "faces": 152260,
+      "fix": {
+        "keep": "^Acer_large_1_LOD0$"
+      }
+    },
+    {
+      "slot": "hedge",
+      "kind": "model",
+      "source": "sketchfab",
+      "id": "bd335c9bb20a4cdc8d41960ea3e9b106",
+      "slug": "hedge",
+      "targetSize": {
+        "axis": "length",
+        "meters": 2
+      },
+      "pickedBy": "substitute",
+      "title": "Square Hedge",
+      "author": "RBG_illustrations",
+      "license": "CC-BY 4.0",
+      "url": "https://sketchfab.com/3d-models/square-hedge-bd335c9bb20a4cdc8d41960ea3e9b106",
+      "faces": 420
+    },
+    {
+      "slot": "raven_rigged",
+      "kind": "model",
+      "source": "sketchfab",
+      "id": "d5a9b0df4da3493688b63ce42c8a83e2",
+      "slug": "raven_rigged",
+      "targetSize": {
+        "axis": "length",
+        "meters": 0.6
+      },
+      "title": "Crow",
+      "author": "Alexei Ostapenko",
+      "license": "CC-BY 4.0",
+      "url": "https://sketchfab.com/3d-models/crow-d5a9b0df4da3493688b63ce42c8a83e2",
+      "faces": 2208
+    },
+    {
+      "slot": "human_npc_m",
+      "kind": "model",
+      "source": "sketchfab",
+      "id": "3e660352084843d3bb36a371a7a6427b",
+      "slug": "human_npc_m",
+      "targetSize": {
+        "axis": "height",
+        "meters": 1.75
+      },
+      "maxTris": 30000,
+      "pickedBy": "substitute",
+      "title": "Middle Age Man | Rigged & Animated | FREE",
+      "author": "Animator05",
+      "license": "CC-BY 4.0",
+      "url": "https://sketchfab.com/3d-models/middle-age-man-rigged-animated-free-3e660352084843d3bb36a371a7a6427b",
+      "faces": 38286
+    },
+    {
+      "slot": "human_npc_m2",
+      "kind": "model",
+      "source": "sketchfab",
+      "id": "a46bc9f67aaa415bb4f3241eef900e7f",
+      "slug": "human_npc_m2",
+      "targetSize": {
+        "axis": "height",
+        "meters": 1.75
+      },
+      "maxTris": 30000,
+      "title": "Eric Rigged 001 - Rigged 3D Business Man",
+      "author": "Renderpeople",
+      "license": "CC-BY 4.0",
+      "url": "https://sketchfab.com/3d-models/eric-rigged-001-rigged-3d-business-man-a46bc9f67aaa415bb4f3241eef900e7f",
+      "faces": 20542
+    },
+    {
+      "slot": "human_npc_f",
+      "kind": "model",
+      "source": "sketchfab",
+      "id": "acf520f450d14dd799f98a6fede3edf5",
+      "slug": "human_npc_f",
+      "targetSize": {
+        "axis": "height",
+        "meters": 1.65
+      },
+      "maxTris": 30000,
+      "title": "Carla Rigged 001 - Rigged 3D Business Women",
+      "author": "Renderpeople",
+      "license": "CC-BY 4.0",
+      "url": "https://sketchfab.com/3d-models/carla-rigged-001-rigged-3d-business-women-acf520f450d14dd799f98a6fede3edf5",
+      "faces": 19988
+    },
+    {
+      "slot": "hdri_night_overcast",
+      "kind": "hdri",
+      "source": "polyhaven",
+      "id": "kloppenheim_07_puresky",
+      "slug": "hdri_night",
+      "existing": "public/assets/hdri_night/kloppenheim_07_puresky_1k.hdr",
+      "title": "Kloppenheim 07 (Pure Sky)",
+      "author": "Greg Zaal, Jarod Guest",
+      "license": "CC0 1.0",
+      "url": "https://polyhaven.com/a/kloppenheim_07_puresky"
+    },
+    {
+      "slot": "tex_cobble_wet",
+      "kind": "texture",
+      "source": "polyhaven",
+      "id": "cobblestone_floor_04",
+      "slug": "tex_cobble_wet",
+      "title": "Cobblestone Floor 04",
+      "author": "Rob Tuytel",
+      "license": "CC0 1.0",
+      "url": "https://polyhaven.com/a/cobblestone_floor_04"
+    },
+    {
+      "slot": "tex_sandstone_red",
+      "kind": "texture",
+      "source": "polyhaven",
+      "id": "red_sandstone_wall",
+      "slug": "tex_sandstone_red",
+      "title": "Red Sandstone Wall",
+      "author": "Amal Kumar",
+      "license": "CC0 1.0",
+      "url": "https://polyhaven.com/a/red_sandstone_wall"
+    },
+    {
+      "slot": "tex_bronze_patina",
+      "kind": "texture",
+      "source": "polyhaven",
+      "id": "green_metal_rust",
+      "slug": "tex_bronze_patina",
+      "title": "Green Metal Rust",
+      "author": "Rob Tuytel",
+      "license": "CC0 1.0",
+      "url": "https://polyhaven.com/a/green_metal_rust"
+    },
+    {
+      "slot": "tex_grass",
+      "kind": "texture",
+      "source": "polyhaven",
+      "id": "leafy_grass",
+      "slug": "tex_grass",
+      "title": "Leafy Grass",
+      "author": "Charlotte Baglioni",
+      "license": "CC0 1.0",
+      "url": "https://polyhaven.com/a/leafy_grass"
+    },
+    {
+      "slot": "tex_gravel",
+      "kind": "texture",
+      "source": "polyhaven",
+      "id": "rocky_gravel",
+      "slug": "tex_gravel",
+      "title": "Rocky Gravel",
+      "author": "Dario Barresi, Dimitrios Savva",
+      "license": "CC0 1.0",
+      "url": "https://polyhaven.com/a/rocky_gravel"
+    },
+    {
+      "slot": "tex_bark",
+      "kind": "texture",
+      "source": "polyhaven",
+      "id": "bark_platanus",
+      "slug": "tex_bark",
+      "title": "Bark Platanus",
+      "author": "Dimitrios Savva",
+      "license": "CC0 1.0",
+      "url": "https://polyhaven.com/a/bark_platanus"
+    }
+  ]
+}

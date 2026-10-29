@@ -29,9 +29,120 @@
       "author": "The Noto Project Authors",
       "license": "SIL Open Font License 1.1",
       "source": "https://github.com/notofonts/arabic"
+    },
+    {
+      "asset": "Pyramid (pyramid_fallback)",
+      "author": "quedlin",
+      "license": "CC-BY 4.0",
+      "source": "https://sketchfab.com/3d-models/pyramid-b47c6d297832428faee5c28a874949b7"
+    },
+    {
+      "asset": "Classic Street Lamp Post (streetlamp)",
+      "author": "sacapuntas",
+      "license": "CC-BY 4.0",
+      "source": "https://sketchfab.com/3d-models/classic-street-lamp-post-dea5920f66814e04a66fa87b338e0e8d"
+    },
+    {
+      "asset": "Park Bench (bench)",
+      "author": "DutraBR98",
+      "license": "CC-BY 4.0",
+      "source": "https://sketchfab.com/3d-models/park-bench-84426d6537ac4cdc837d602ccabe7036"
+    },
+    {
+      "asset": "Soviet Kiosk – 3D Model (kiosk)",
+      "author": "dimmeyster",
+      "license": "CC-BY 4.0",
+      "source": "https://sketchfab.com/3d-models/soviet-kiosk-3d-model-3b85ae768ecd43f394991a1f0027c72c"
+    },
+    {
+      "asset": "[CC0] Newspaper Stack - Ready to Unity HDRP (newspapers)",
+      "author": "karlwirbelwind",
+      "license": "CC-BY 4.0",
+      "source": "https://sketchfab.com/3d-models/cc0-newspaper-stack-ready-to-unity-hdrp-c4311a0b918643af97904e10c7a34efc"
+    },
+    {
+      "asset": "4 Linden Trees Pack (medium-Poly) (tree_linden)",
+      "author": "Sereib",
+      "license": "CC-BY 4.0",
+      "source": "https://sketchfab.com/3d-models/4-linden-trees-pack-medium-poly-b497c5f3f26344c29f27f53dc2ca74f4"
+    },
+    {
+      "asset": "Maple trees pack (lowpoly, game ready, LODs) (tree_chestnut)",
+      "author": "LOLIPOP",
+      "license": "CC-BY 4.0",
+      "source": "https://sketchfab.com/3d-models/maple-trees-pack-lowpoly-game-ready-lods-b5d2833c258f4054a01ee2b4ef85adf0"
+    },
+    {
+      "asset": "Square Hedge (hedge)",
+      "author": "RBG_illustrations",
+      "license": "CC-BY 4.0",
+      "source": "https://sketchfab.com/3d-models/square-hedge-bd335c9bb20a4cdc8d41960ea3e9b106"
+    },
+    {
+      "asset": "Crow (raven_rigged)",
+      "author": "Alexei Ostapenko",
+      "license": "CC-BY 4.0",
+      "source": "https://sketchfab.com/3d-models/crow-d5a9b0df4da3493688b63ce42c8a83e2"
+    },
+    {
+      "asset": "Middle Age Man | Rigged & Animated | FREE (human_npc_m)",
+      "author": "Animator05",
+      "license": "CC-BY 4.0",
+      "source": "https://sketchfab.com/3d-models/middle-age-man-rigged-animated-free-3e660352084843d3bb36a371a7a6427b"
+    },
+    {
+      "asset": "Eric Rigged 001 - Rigged 3D Business Man (human_npc_m2)",
+      "author": "Renderpeople",
+      "license": "CC-BY 4.0",
+      "source": "https://sketchfab.com/3d-models/eric-rigged-001-rigged-3d-business-man-a46bc9f67aaa415bb4f3241eef900e7f"
+    },
+    {
+      "asset": "Carla Rigged 001 - Rigged 3D Business Women (human_npc_f)",
+      "author": "Renderpeople",
+      "license": "CC-BY 4.0",
+      "source": "https://sketchfab.com/3d-models/carla-rigged-001-rigged-3d-business-women-acf520f450d14dd799f98a6fede3edf5"
+    },
+    {
+      "asset": "Cobblestone Floor 04 (tex_cobble_wet)",
+      "author": "Rob Tuytel",
+      "license": "CC0 1.0",
+      "source": "https://polyhaven.com/a/cobblestone_floor_04"
+    },
+    {
+      "asset": "Red Sandstone Wall (tex_sandstone_red)",
+      "author": "Amal Kumar",
+      "license": "CC0 1.0",
+      "source": "https://polyhaven.com/a/red_sandstone_wall"
+    },
+    {
+      "asset": "Green Metal Rust (tex_bronze_patina)",
+      "author": "Rob Tuytel",
+      "license": "CC0 1.0",
+      "source": "https://polyhaven.com/a/green_metal_rust"
+    },
+    {
+      "asset": "Leafy Grass (tex_grass)",
+      "author": "Charlotte Baglioni",
+      "license": "CC0 1.0",
+      "source": "https://polyhaven.com/a/leafy_grass"
+    },
+    {
+      "asset": "Rocky Gravel (tex_gravel)",
+      "author": "Dario Barresi, Dimitrios Savva",
+      "license": "CC0 1.0",
+      "source": "https://polyhaven.com/a/rocky_gravel"
+    },
+    {
+      "asset": "Bark Platanus (tex_bark)",
+      "author": "Dimitrios Savva",
+      "license": "CC0 1.0",
+      "source": "https://polyhaven.com/a/bark_platanus"
     }
   ],
   "notes": [
-    "Fritz (companion raven) is a built-in low-poly placeholder for now; no third-party asset."
+    "Fritz (companion raven): the in-game bird is the CC-BY 'Crow' model credited above, driven by Fritz's own procedural motion for any clip the model lacks (`fly`, `perch`, `idle`, `caw`); until the model is attached the bird is a built-in low-poly primitive.",
+    "The pyramid and the Schloss are built in code from the CC0 Poly Haven sandstone texture credited above; no third-party mesh. The plane trees reuse the linden model.",
+    "Models were rescaled, re-pivoted, decimated where heavy and compressed (meshopt, WebP); otherwise unmodified.",
+    "`public/credits.json` mirrors this file for the in-game Credits screen; both are generated by `tools/assets/make_credits.py`."
   ]
 }

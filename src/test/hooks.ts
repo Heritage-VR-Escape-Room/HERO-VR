@@ -74,6 +74,14 @@ export interface HeroHooks {
   menuOpen?: () => boolean;
   /** Show the end-of-slice card (game scenes). */
   showEndCard?: () => void;
+  /** Load a model through src/world/assets.ts and describe it (clips, bone names, triangle count, bounds). */
+  loadModelInfo?: (slug: string) => Promise<{
+    clips: string[];
+    bones: string[];
+    tris: number;
+    size: [number, number, number];
+    min: [number, number, number];
+  }>;
   [key: string]: unknown;
 }
 

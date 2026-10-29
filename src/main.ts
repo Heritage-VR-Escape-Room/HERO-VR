@@ -18,6 +18,7 @@ import { createSaveService } from './logic/save';
 import { DialogueRunner } from './dialogue/runner';
 import { StoryDirector } from './dialogue/director';
 import { createSubtitles } from './ui/subtitles';
+import { loadModel, setAssetRenderer } from './world/assets';
 import { createFpsMeter } from './logic/fpsMeter';
 import { applyGraphics } from './render/liveGraphics';
 import { createSettingsScreen, type SettingsScreen } from './ui/settingsScreen';
@@ -450,6 +451,8 @@ async function boot(): Promise<void> {
   window.addEventListener('resize', () => renderer.setSize(window.innerWidth, window.innerHeight, false));
   installHooks({ backend });
   installI18nHooks(i18n);
+  setAssetRenderer(renderer);
+  installHooks({ loadModelInfo: async (slug) => (await import('./test/modelInfo')).describeModel(await loadModel(slug)) });
 
   // Dialogue and story state live for the whole session, whatever the scene.
   const save = createSaveService(kv);

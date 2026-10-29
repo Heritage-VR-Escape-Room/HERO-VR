@@ -73,8 +73,8 @@ interface Rig {
   beak: Object3D | undefined;
 }
 
-const WING_L = /wing.*(^|[^a-z])(l|left)([^a-z]|$)|(^|[^a-z])(l|left)([^a-z]|$).*wing/i;
-const WING_R = /wing.*(^|[^a-z])(r|right)([^a-z]|$)|(^|[^a-z])(r|right)([^a-z]|$).*wing/i;
+const WING_L = /wing.*(^|[^a-z])(l|left)([^a-z]|$)|(^|[^a-z])(l|left)([^a-z]|$).*wing|(^|[^a-z])l[_\s]*(clavicle|shoulder|upperarm)/i;
+const WING_R = /wing.*(^|[^a-z])(r|right)([^a-z]|$)|(^|[^a-z])(r|right)([^a-z]|$).*wing|(^|[^a-z])r[_\s]*(clavicle|shoulder|upperarm)/i;
 const HEAD = /head|neck/i;
 
 /** Find wing and head nodes by name; `head` prefers a node literally named head over a neck. */

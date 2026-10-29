@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Object3D, Vector3 } from 'three/webgpu';
-import { Fritz } from '../../src/companion/fritz';
+import { Fritz, findRig } from '../../src/companion/fritz';
 
 function makeFritz(): Fritz {
   return new Fritz({
@@ -55,5 +55,21 @@ describe('Fritz procedural animation on an attached model', () => {
       seen.push(m.head.rotation.z);
     }
     expect(Math.max(...seen) - Math.min(...seen)).toBeGreaterThan(0.05);
+  });
+});
+
+describe('findRig on the placeholder crow bone names', () => {
+  it('finds both wings (clavicle bones) and the head', () => {
+    const root = new Object3D();
+    // Names as three.js sanitizes them from the CC-BY Crow GLB (public/assets/raven_rigged).
+    for (const n of ['CROW__Neck_04', 'CROW__Head_05', 'CROW__L_Clavicle_07', 'WingLeftC_011', 'CROW__R_Clavicle_019', 'WingRightC_023']) {
+      const o = new Object3D();
+      o.name = n;
+      root.add(o);
+    }
+    const rig = findRig(root);
+    expect(rig.wings.map((w) => w.node.name).sort()).toEqual(['CROW__L_Clavicle_07', 'CROW__R_Clavicle_019']);
+    expect(rig.wings.find((w) => w.node.name.includes('_L_'))!.side).toBe(1);
+    expect(rig.head!.name).toBe('CROW__Head_05');
   });
 });
