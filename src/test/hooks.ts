@@ -89,7 +89,7 @@ export interface HeroHooks {
   /** Show the end-of-slice card (game scenes). */
   showEndCard?: () => void;
   /** Put the player's feet on the ground at (x, z), facing bearing `yaw`. */
-  teleport?: (x: number, z: number, yaw: number) => void;
+  teleport?: (x: number, z: number, yaw: number, pitch?: number) => void;
   /** Override the camera with a named debug viewpoint (scene=garden: 'aerial'); null gives it back to the player. */
   viewpoint?: (name: string | null) => boolean;
   /** Put the camera at `position` looking at `target` (a 'debug' viewpoint; scene=garden). */

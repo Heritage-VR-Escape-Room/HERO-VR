@@ -192,6 +192,8 @@ export class CipherLock {
     if (!this.focused) return;
     this.focused = false;
     this.hint.style.display = 'none';
+    // Left before the camera moved at all: nothing to blend back.
+    if (this.blend === 0) this.releaseModalNow();
   }
 
   /** Step the inner ring (+1 clockwise). */

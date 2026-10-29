@@ -128,7 +128,7 @@ type GameScene = 'flat' | 'garden';
  * `?scene=garden` (the Schlossgarten). Physics steps at a fixed 60 Hz;
  * gameplay updates every tick; rendering is gated by the cap.
  */
-async function startGame(session: Session, sceneName: GameScene): Promise<void> {
+async function startGame(session: Session, sceneName: GameScene, opts: { newGame?: boolean } = {}): Promise<void> {
   const { renderer, canvas, settings, backend, i18n, params, inventory, director, runner, meter } = session;
   const [
     { PhysicsWorld },
@@ -186,7 +186,13 @@ async function startGame(session: Session, sceneName: GameScene): Promise<void> 
     input: () => keyboard.move(),
     look: () => settings.get(),
   });
-  controller.teleport(world.spawn, world.spawnYaw);
+  if (plaza) {
+    // Act 0 opens on the wake bench, looking at the pyramid.
+    const { PLAZA, bearingToward } = await import('./logic/plazaLayout');
+    const wake = PLAZA.viewpoints.wake!;
+    const [bx, , bz] = wake.position;
+    controller.teleport({ x: bx, y: garden!.groundHeight(bx, bz), z: bz }, bearingToward(wake.position, wake.target));
+  } else controller.teleport(world.spawn, world.spawnYaw);
   const state = createGameState('menu');
   const toMenu = (): void => goToMainMenu(params);
   const pause = createPauseMenu({
@@ -212,6 +218,7 @@ async function startGame(session: Session, sceneName: GameScene): Promise<void> 
   const hud = createHud(i18n, () => codeLabel(settings.get().bindings.interact));
   interactor.onFocusChange((i) => hud.showPrompt(i?.promptKey ?? null));
   const endCard = createEndCard(i18n, toMenu);
+  let act0: import('./dialogue/act0').Act0 | null = null;
   const showEndCard = (): void => {
     modal.enter();
     endCard.show();
@@ -241,21 +248,24 @@ async function startGame(session: Session, sceneName: GameScene): Promise<void> 
     ]);
     const pyr = plaza.pyramid;
     lock = new CipherLock({ ...lockDeps, parts: pyr.lockParts });
-    interactor.register(lock.interactable);
+    const lockUse = lock.interactable;
+    interactor.register({ ...lockUse, interact: () => (act0?.lockUsed(), lockUse.interact()) });
     interactor.register({
       id: 'plaque',
       promptKey: 'prompt.inspect',
       object: pyr.plaque,
       canInteract: () => true,
       // After Fritz has translated the Latin, the inspect view shows its meaning.
-      interact: () =>
+      interact: () => (
+        act0?.plaqueInspected(),
         inspect.open(pyr.plaque, {
           textKey: director.state().firedBeats.includes('b5_latin_translation') ? 'plaque.latin_meaning' : undefined,
-        }),
+        })),
     });
     interactor.register(pyr.jammer.interactable);
     director.registerDisableable('jammer', () => pyr.jammer.disable(true));
-    interactor.register(createDocumentInteractable({ id: 'manifesto', docKey: 'vanguard_manifesto', object: pyr.manifesto }));
+    const manifesto = createDocumentInteractable({ id: 'manifesto', docKey: 'vanguard_manifesto', object: pyr.manifesto });
+    interactor.register({ ...manifesto, interact: () => (act0?.manifestoRead(), manifesto.interact()) });
     const part = createPickup({
       id: 'ticket_printer_part',
       itemId: 'ticket_printer_part',
@@ -293,7 +303,15 @@ async function startGame(session: Session, sceneName: GameScene): Promise<void> 
   const sz = world.spawn.z;
   if (plaza) {
     await plaza.attachFritz(fritz);
-    fritz.place('lamp_3');
+    fritz.place(director.state().firedBeats.includes('b4_fritz_arrives') ? 'pyramid_tip' : 'lamp_3');
+    const [{ createAct0 }, { PLAZA }] = await Promise.all([import('./dialogue/act0'), import('./logic/plazaLayout')]);
+    const [kx, , kz] = PLAZA.kiosk.position;
+    act0 = createAct0({
+      director,
+      flyFritzTo: (id) => void fritz.flyTo(id),
+      showEndCard,
+      kiosk: { x: kx, z: kz },
+    });
   } else if (props.has('perches')) {
     fritz.addPerch('p1', new Vector3(sx - 6, 1.2, sz + 2), 90);
     fritz.addPerch('p2', new Vector3(sx + 6, 1.2, sz + 2), -90);
@@ -380,7 +398,7 @@ async function startGame(session: Session, sceneName: GameScene): Promise<void> 
     plaqueLocale: () => plaza?.pyramid.plaqueText.drawnLocale() ?? null,
     activePuzzle: () => activePuzzle?.id ?? null,
     fogLightCount: () => world.fog.scatteringLights().length,
-    teleport: (x: number, z: number, yaw: number) => controller.teleport({ x, y: garden?.groundHeight(x, z) ?? 0, z }, yaw),
+    teleport: (x: number, z: number, yaw: number, pitch = 0) => controller.teleport({ x, y: garden?.groundHeight(x, z) ?? 0, z }, yaw, pitch),
     viewpoint: (name: string | null) => garden?.setViewpoint(name) ?? false,
     lookFrom: (position: [number, number, number], target: [number, number, number], fov = 40) => {
       garden?.addViewpoint('debug', { position, lookAt: target, up: [0, 1, 0], fov, fogBypass: false });
@@ -400,6 +418,16 @@ async function startGame(session: Session, sceneName: GameScene): Promise<void> 
       state: () => lock.state(),
     },
   });
+
+  if (act0 && opts.newGame) {
+    // Wake up: fade in from black, then Julian's first line.
+    const black = document.createElement('div');
+    black.style.cssText = 'position:fixed;inset:0;background:#000;pointer-events:none;z-index:50;transition:opacity 3s ease-in';
+    document.body.append(black);
+    requestAnimationFrame(() => requestAnimationFrame(() => (black.style.opacity = '0')));
+    black.addEventListener('transitionend', () => black.remove());
+  }
+  act0?.start(opts.newGame ?? false);
 
   const fixed = createFixedStep(PHYSICS_HZ, MAX_SUBSTEPS);
   let lastTick: number | null = null;
@@ -422,6 +450,7 @@ async function startGame(session: Session, sceneName: GameScene): Promise<void> 
       if (active !== (activePuzzle === lockHint)) setActivePuzzle(active ? lockHint : null);
     }
     plaza?.update(dt, world.camera.position);
+    act0?.update(controller.position, lock?.state().solved ?? false);
     fritz.update(dt);
     interactor.update();
     const st = state.get();
@@ -475,7 +504,7 @@ async function startMenu(session: Session): Promise<void> {
     backdrop.dispose();
     const data = restore ? save.load() : null;
     if (data) director.restore(data);
-    await startGame(session, 'flat');
+    await startGame(session, 'garden', { newGame: !data });
   };
   const menu = createMainMenu({
     i18n,
