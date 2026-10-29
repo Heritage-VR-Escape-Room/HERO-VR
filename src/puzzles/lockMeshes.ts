@@ -48,7 +48,7 @@ const BRASS = '#8a6d3b';
 const BRASS_LIGHT = '#b08d57';
 const INK = '#1c1710';
 
-function canvasTexture(c: HTMLCanvasElement): Texture {
+export function canvasTexture(c: HTMLCanvasElement): Texture {
   const t = new CanvasTexture(c);
   t.colorSpace = SRGBColorSpace;
   t.anisotropy = 8;
@@ -56,7 +56,7 @@ function canvasTexture(c: HTMLCanvasElement): Texture {
 }
 
 /** A disc texture with 26 upright letters around the rim, A at the top, clockwise. */
-function ringTexture(face: string, innerFrac: number): Texture {
+export function ringTexture(face: string, innerFrac: number): Texture {
   const size = 512;
   const c = document.createElement('canvas');
   c.width = c.height = size;
@@ -79,7 +79,8 @@ function ringTexture(face: string, innerFrac: number): Texture {
   return canvasTexture(c);
 }
 
-function labelTexture(text: string, w: number, h: number, font: string, bg: string, arrows = false): { tex: Texture; draw(t: string): void } {
+/** A redrawable label (tumbler letters, engraved plates); `arrows` adds up/down carets. */
+export function labelTexture(text: string, w: number, h: number, font: string, bg: string, arrows = false): { tex: Texture; draw(t: string): void } {
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;

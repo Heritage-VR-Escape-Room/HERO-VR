@@ -47,6 +47,7 @@ test('Arabic is rtl, canvas text draws, switching to de restores ltr', async ({ 
 
 test('language switch re-resolves a playing subtitle', async ({ page }, info) => {
   test.skip(info.project.name !== 'default', 'subtitle locale check runs once, in the default project');
+  test.setTimeout(120_000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   const ready = page.waitForEvent('console', {
@@ -55,6 +56,8 @@ test('language switch re-resolves a playing subtitle', async ({ page }, info) =>
   });
   await page.goto('/?test=1&lang=en');
   await ready;
+  // Let the menu backdrop finish its first-frame pipeline compile before timing a subtitle.
+  await page.waitForFunction(() => (window.__hero?.frames?.() ?? 0) > 10, undefined, { timeout: 90_000 });
 
   expect(await page.evaluate(() => window.__hero!.fireBeat!('b1_wake'))).toBe(true);
   await expect(page.locator('#subtitle-text')).toHaveText(en['dlg.b1.julian']);

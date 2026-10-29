@@ -1,11 +1,16 @@
 /**
  * Main-menu background: a world seen from a camera slowly orbiting a
- * viewpoint. Until the plaza exists (Task 13) the world is the fogtest scene;
- * Task 13 passes the plaza and its `menu_orbit` viewpoint instead.
+ * viewpoint. The world comes from a factory: the game passes the plaza and
+ * its `menu_orbit` viewpoint (world/plazaBackdrop.ts); the fogtest scene is
+ * the default for anything else.
  */
-import { Mesh, type PerspectiveCamera, type Texture, type WebGPURenderer } from 'three/webgpu';
+import { Mesh, type PerspectiveCamera, type Scene, type Texture, type WebGPURenderer } from 'three/webgpu';
 import type { GraphicsOptions } from '../logic/presets';
-import { createFogTest, type FogTestWorld } from './fogtest';
+import { createFogTest } from './fogtest';
+import type { VolumetricFog } from './fog';
+import type { Highlight } from './highlight';
+import type { LightingRig } from './lighting';
+import type { PostChain } from './post';
 
 export interface OrbitViewpoint {
   /** Point the camera circles and looks at (world metres). */
@@ -27,8 +32,34 @@ export function orbitCamera(camera: PerspectiveCamera, vp: OrbitViewpoint, tSec:
   camera.lookAt(vp.target.x, vp.target.y, vp.target.z);
 }
 
+/** What the backdrop needs from a world. */
+export interface BackdropWorld {
+  scene: Scene;
+  camera: PerspectiveCamera;
+  rig: LightingRig;
+  fog: VolumetricFog;
+  highlight: Highlight;
+  post: PostChain;
+}
+
+export interface BackdropSource {
+  world: BackdropWorld;
+  viewpoint: OrbitViewpoint;
+  /** Per rendered frame, after the camera is placed (animated props). */
+  update?(dtSec: number): void;
+  /** Frees anything beyond the scene graph (physics). */
+  dispose?(): void;
+}
+
+export type BackdropFactory = (renderer: WebGPURenderer, opts: GraphicsOptions) => Promise<BackdropSource>;
+
+export const fogtestBackdrop: BackdropFactory = async (renderer, opts) => ({
+  world: await createFogTest(renderer, opts),
+  viewpoint: FOGTEST_ORBIT,
+});
+
 export interface MenuBackdrop {
-  world: FogTestWorld;
+  world: BackdropWorld;
   /** Move the camera along the orbit and render one frame. */
   render(tSec: number): void;
   dispose(): void;
@@ -37,14 +68,18 @@ export interface MenuBackdrop {
 export async function createMenuBackdrop(
   renderer: WebGPURenderer,
   opts: GraphicsOptions,
-  viewpoint: OrbitViewpoint = FOGTEST_ORBIT,
+  factory: BackdropFactory = fogtestBackdrop,
 ): Promise<MenuBackdrop> {
-  const world = await createFogTest(renderer, opts);
+  const source = await factory(renderer, opts);
+  const { world, viewpoint } = source;
   world.highlight.setHighlighted([]);
+  let last: number | null = null;
   return {
     world,
     render(tSec) {
       orbitCamera(world.camera, viewpoint, tSec);
+      source.update?.(last === null ? 0 : Math.min(tSec - last, 0.1));
+      last = tSec;
       world.rig.update(world.camera.position);
       world.post.render();
     },
@@ -60,6 +95,7 @@ export async function createMenuBackdrop(
         }
       });
       (world.scene.background as Texture | null)?.dispose();
+      source.dispose?.();
     },
   };
 }

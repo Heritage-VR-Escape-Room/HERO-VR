@@ -95,5 +95,7 @@
   "ui.size.l": "Large",
   "ui.credits.error": "The credits list could not be loaded. Check your connection and open Credits again.",
   "ui.end.title": "End of Slice",
-  "ui.end.thanks": "Thank you for playing"
+  "ui.end.thanks": "Thank you for playing",
+  "doc.vanguard_manifesto.title": "VANGUARD ARMAMENTS: Routing Order 7/19 (Confidential)",
+  "doc.vanguard_manifesto.body": "For section heads only. Destroy after reading.\n\nShipments 14 to 22 (surface-to-surface missiles, crated and declared as \"agricultural machinery\") leave the depot at night on the portal train line. The line runs beneath the garden railway; the public sees nothing but the miniature train.\n\nFrom the portal terminus the crates travel on to Port Said, where the customs papers have already been arranged. Should anything be found, the newspapers have their story ready: foreign hands, foreign tankers, foreign blame.\n\nThe signal jammers in the monument bases stay on until the last shipment has cleared. Keep the Compound-7 dispersal at full strength. A city that cannot remember yesterday will not ask about tonight.\n\nVanguard Armaments, Logistics Directorate"
 }

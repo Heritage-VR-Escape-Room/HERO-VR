@@ -2,12 +2,15 @@
  * Interaction: each frame a 2.2 m ray from the camera is cast against the
  * INTERACTABLE collision group. The hit collider's `id` (set in its collider
  * data) names a registered Interactable; the `interact` binding fires it.
+ * A WORLD collider nearer than that hit (a closed door, a wall) blocks it.
  */
 import { Vector3, type Camera, type Object3D } from 'three/webgpu';
 import type { ActionName } from '../logic/bindings';
 import { GROUPS, type PhysicsWorld } from '../world/colliders';
 
 export const INTERACT_RANGE_M = 2.2;
+/** A WORLD surface must be at least this much nearer than the interactable to block it. */
+const OCCLUDER_EPS_M = 0.01;
 
 export interface Interactable {
   id: string;
@@ -68,10 +71,12 @@ export class Interactor {
       const cam = this.deps.camera;
       cam.getWorldPosition(this.origin);
       cam.getWorldDirection(this.dir);
-      const hit = this.deps.physics.raycast(this.origin, this.dir, INTERACT_RANGE_M, GROUPS.INTERACTABLE);
+      const physics = this.deps.physics;
+      const hit = physics.raycast(this.origin, this.dir, INTERACT_RANGE_M, GROUPS.INTERACTABLE);
       const id = hit?.data.id;
       const found = typeof id === 'string' ? this.items.get(id) : undefined;
-      if (found?.canInteract()) next = found;
+      const occluded = hit !== null && physics.raycast(this.origin, this.dir, hit.distance - OCCLUDER_EPS_M, GROUPS.WORLD) !== null;
+      if (found?.canInteract() && !occluded) next = found;
     }
     this.setFocus(next);
   }

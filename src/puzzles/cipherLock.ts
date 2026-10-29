@@ -14,12 +14,13 @@ import {
   MathUtils,
   Mesh,
   MeshBasicMaterial,
-  PointLight,
   Quaternion,
   Raycaster,
   SphereGeometry,
   Vector2,
   Vector3,
+  type Material,
+  type MeshStandardMaterial,
   type PerspectiveCamera,
 } from 'three/webgpu';
 import type { StoryDirector } from '../dialogue/director';
@@ -39,7 +40,9 @@ const DOOR_OPEN_RAD = -MathUtils.degToRad(110);
 const HANDLE_PULL_RAD = 0.5;
 const WHEEL_PX_PER_STEP = 60;
 const STEAM_PUFFS = 24;
-const LAMP_INTENSITY = 1.2;
+/** Emissive fill the lock's own materials get while focused, so the dial reads at night without a light. */
+const FOCUS_FILL = 0.3;
+const FOCUS_FILL_COLOR = '#ffd9a0';
 
 export type LockSound = 'ring_tick' | 'tumbler_click' | 'handle_rattle' | 'lock_clunk' | 'steam';
 
@@ -85,8 +88,12 @@ export class CipherLock {
   private readonly ndc = new Vector2();
   private readonly hint: HTMLDivElement;
   private readonly puffs: Mesh[] = [];
-  /** A warm lamp at the player's shoulder that fades in with the focus, so the dial reads in the night scene. */
-  private readonly lamp = new PointLight('#ffd9a0', 0, 3, 2);
+  /**
+   * Materials that glow faintly while focused. This stands in for a lamp at
+   * the player's shoulder: a light per lock would cost every frame, in every
+   * material and in the fog, even while nobody is looking at the lock.
+   */
+  private readonly fill: MeshStandardMaterial[] = [];
 
   private focused = false;
   private blend = 0; // 0 = controller pose, 1 = lock view
@@ -134,8 +141,7 @@ export class CipherLock {
   constructor(private readonly deps: CipherLockDeps) {
     this.parts = deps.parts ?? buildLockMeshes();
     this.onSound = deps.onSound;
-    this.lamp.position.set(0.25, 0.3, 0.55);
-    this.parts.root.add(this.lamp);
+    this.collectFill();
     this.hint = document.createElement('div');
     this.hint.id = 'lock-hint';
     this.hint.style.cssText =
@@ -245,7 +251,8 @@ export class CipherLock {
     this.advancePhase(dt);
     this.updateSteam(dt);
 
-    this.lamp.intensity = LAMP_INTENSITY * smooth(this.blend);
+    const glow = FOCUS_FILL * smooth(this.blend);
+    for (const m of this.fill) m.emissiveIntensity = glow;
     if (this.blend > 0) this.applyCamera(smooth(this.blend));
   }
 
@@ -267,6 +274,24 @@ export class CipherLock {
       return new Vector3(r.left + ((v.x + 1) / 2) * r.width, r.top + ((1 - v.y) / 2) * r.height, 0);
     };
     return this.parts.tumblerFaces.map((f) => ({ x: proj(f, 0).x, top: proj(f, 0.025).y, bottom: proj(f, -0.025).y }));
+  }
+
+  /** Every lock material without its own glow gets the focus fill (textured ones glow through their map). */
+  private collectFill(): void {
+    const seen = new Set<Material>();
+    this.parts.root.traverse((o) => {
+      const mesh = o as Mesh;
+      if (!mesh.isMesh) return;
+      for (const mat of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+        const m = mat as MeshStandardMaterial;
+        if (seen.has(m) || !m.emissive || m.emissive.getHex() !== 0) continue;
+        seen.add(m);
+        m.emissive.set(FOCUS_FILL_COLOR);
+        if (m.map && !m.emissiveMap) m.emissiveMap = m.map;
+        m.emissiveIntensity = 0;
+        this.fill.push(m);
+      }
+    });
   }
 
   private releaseModalNow(): void {

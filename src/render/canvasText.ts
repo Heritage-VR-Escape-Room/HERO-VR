@@ -13,10 +13,11 @@ export interface DrawTextOptions {
 
 /**
  * Word-wrap `text` to `maxWidth` and draw it from the canvas origin (0,0) downwards.
+ * Returns the height drawn (lines x lineHeight).
  * `align: 'start'` follows the text direction (right edge for rtl, left edge for ltr).
  * Shaping and bidi are left to the browser via `ctx.direction`.
  */
-export function drawText(ctx: CanvasRenderingContext2D, text: string, opts: DrawTextOptions): void {
+export function drawText(ctx: CanvasRenderingContext2D, text: string, opts: DrawTextOptions): number {
   ctx.save();
   ctx.direction = opts.dir;
   ctx.font = opts.font;
@@ -46,6 +47,7 @@ export function drawText(ctx: CanvasRenderingContext2D, text: string, opts: Draw
     y += opts.lineHeight;
   }
   ctx.restore();
+  return y;
 }
 
 export interface LocalizedCanvasTextureOptions {
@@ -58,6 +60,15 @@ export interface LocalizedCanvasTextureOptions {
   align: 'start' | 'center';
   background?: string;
   padding?: number;
+  /**
+   * A line drawn centred above the localized text, always left-to-right
+   * (e.g. the plaque's Latin, which stays Latin in every language).
+   */
+  header?: { key: string; font: string; lineHeight: number; color?: string };
+  /** Space between the header and the text (px). */
+  headerGap?: number;
+  /** Draws under the text after the background (borders, ornaments). */
+  decorate?: (ctx: CanvasRenderingContext2D, width: number, height: number) => void;
 }
 
 /** A THREE.CanvasTexture that draws an i18n key and redraws on every locale change. */
@@ -68,6 +79,7 @@ export class LocalizedCanvasTexture {
   private readonly unsubscribe: () => void;
   private fontsReady = false;
   private disposed = false;
+  private drawn: Locale | null = null;
 
   constructor(
     private readonly i18n: I18n,
@@ -89,6 +101,11 @@ export class LocalizedCanvasTexture {
     });
   }
 
+  /** The locale the texture was last drawn in (null before the fonts have loaded). */
+  drawnLocale(): Locale | null {
+    return this.drawn;
+  }
+
   setKey(key: string): void {
     this.key = key;
     this.redraw();
@@ -104,9 +121,22 @@ export class LocalizedCanvasTexture {
       ctx.fillStyle = background;
       ctx.fillRect(0, 0, width, height);
     }
+    this.opts.decorate?.(ctx, width, height);
     const locale = this.i18n.locale();
     ctx.save();
     ctx.translate(padding, padding);
+    const header = this.opts.header;
+    if (header) {
+      const used = drawText(ctx, this.i18n.t(header.key), {
+        dir: 'ltr',
+        font: header.font,
+        color: header.color ?? this.opts.color,
+        maxWidth: width - padding * 2,
+        lineHeight: header.lineHeight,
+        align: 'center',
+      });
+      ctx.translate(0, used + (this.opts.headerGap ?? 0));
+    }
     drawText(ctx, this.i18n.t(this.key), {
       dir: this.i18n.dir(),
       font: typeof this.opts.font === 'function' ? this.opts.font(locale) : this.opts.font,
@@ -117,6 +147,7 @@ export class LocalizedCanvasTexture {
     });
     ctx.restore();
     this.texture.needsUpdate = true;
+    this.drawn = locale;
   }
 
   dispose(): void {

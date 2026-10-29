@@ -36,8 +36,13 @@ export const HALO_LUMENS = 120;
 /** Plaza centre: the pyramid stands here (spec world frame). */
 export const PYRAMID_POSITION = new Vector3(0, 0, -170);
 
-/** Lamps whose spot casts shadows, per quality. */
-export const LAMP_SHADOWS: Record<RigQuality, number> = { Off: 0, Low: 0, Medium: 2, High: 4, Ultra: 4 };
+/**
+ * Lamps whose spot casts shadows, per quality. Every shadow map is one more
+ * sampler in every lit material, and WebGPU allows 16 per stage: the terrain's
+ * PBR maps plus the moon's three CSM cascades (High, Ultra) leave room for one
+ * lamp; the single moon map (Medium) for two.
+ */
+export const LAMP_SHADOWS: Record<RigQuality, number> = { Off: 0, Low: 0, Medium: 2, High: 1, Ultra: 1 };
 
 /**
  * World direction for a compass bearing (clockwise from north, +Z = north,

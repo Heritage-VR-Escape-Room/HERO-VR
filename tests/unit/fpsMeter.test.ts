@@ -29,4 +29,22 @@ describe('benchmark', () => {
     expect(b.done()).toBe(true);
     expect(b.tick(13_000)).toBeNull(); // reports once
   });
+
+  it('restarts the warm-up after a shader-compile stall, so stalls never count', () => {
+    const b = createBenchmark({ warmupMs: 1000, measureMs: 10_000 });
+    let result: number | null = null;
+    let t = 0;
+    for (; t < 3000 && result === null; t += 20) result = b.tick(t); // 50 fps
+    t += 8000; // an 8 s stall while the first scene pipelines compile
+    for (const end = t + 12_000; t <= end && result === null; t += 20) result = b.tick(t);
+    expect(result).not.toBeNull();
+    expect(result!).toBeCloseTo(50, 0);
+  });
+
+  it('a steadily slow machine still finishes (frame gaps below the stall threshold)', () => {
+    const b = createBenchmark({ warmupMs: 1000, measureMs: 10_000 });
+    let result: number | null = null;
+    for (let t = 0; t <= 20_000 && result === null; t += 250) result = b.tick(t); // 4 fps
+    expect(result).toBeCloseTo(4, 0);
+  });
 });

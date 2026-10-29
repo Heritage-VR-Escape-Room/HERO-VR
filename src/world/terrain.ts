@@ -19,7 +19,7 @@ import {
   RGBAFormat,
 } from 'three/webgpu';
 import { float, mix, normalMap, texture, uv, vec3 } from 'three/tsl';
-import { LAKE, surfaceAt, surfaceWeights, TERRAIN, terrainHeights } from '../logic/worldLayout';
+import { LAKE, puddleMask, surfaceAt, surfaceWeights, TERRAIN, terrainHeights } from '../logic/worldLayout';
 import type { PhysicsWorld } from './colliders';
 import { loadPbrSet, type PbrSet } from './pbr';
 
@@ -31,6 +31,8 @@ const CHUNKS = 4;
 const SPLAT_SIZE = 2048;
 /** Detail texture tiling, metres per repeat. */
 const TILE = { grass: 3.2, grassMacro: 13.7, gravel: 2.6, cobble: 2.4 } as const;
+/** Wet cobble (spec §9): roughness in puddles and on the rest of the cobbles; puddles darken the stone. */
+export const WET_COBBLE = { puddleRoughness: 0.15, roughness: 0.65, puddleDarken: 0.45 } as const;
 /** Water surface height (the bed is 1.5 m below the bank). */
 export const WATER_LEVEL = -0.25;
 
@@ -40,7 +42,7 @@ export interface Terrain {
   dispose(): void;
 }
 
-/** RGBA8 splat: R grass, G gravel, B cobble. Row 0 is the southern edge (z = -size/2). */
+/** RGBA8 splat: R grass, G gravel, B cobble, A standing water (puddles, used on cobble). Row 0 is the southern edge (z = -size/2). */
 export function createSplatTexture(size = SPLAT_SIZE): DataTexture {
   const data = new Uint8Array(size * size * 4);
   const half = TERRAIN.size / 2;
@@ -54,7 +56,7 @@ export function createSplatTexture(size = SPLAT_SIZE): DataTexture {
       data[i] = Math.round(g * 255);
       data[i + 1] = Math.round(gr * 255);
       data[i + 2] = Math.round(c * 255);
-      data[i + 3] = 255;
+      data[i + 3] = c > 0 ? Math.round(puddleMask(x, z) * 255) : 0;
     }
   }
   const tex = new DataTexture(data, size, size, RGBAFormat);
@@ -74,22 +76,26 @@ function splatMaterial(splat: DataTexture, grass: PbrSet, gravel: PbrSet, cobble
   const w: N = texture(splat, p.add(half).div(TERRAIN.size));
   const at = (t: N, tile: number): N => texture(t, p.div(tile));
 
+  // Standing water on the cobbles: smooth, dark, flat (mirror-like in the lamp light).
+  const puddle: N = w.a.mul(w.b);
   // Grass mixes two tilings so the repeat does not show across a lawn.
   const grassCol = mix(at(grass.diff, TILE.grass).rgb, at(grass.diff, TILE.grassMacro).rgb, 0.45);
+  const cobbleCol = at(cobble.diff, TILE.cobble).rgb.mul(mix(float(1), float(WET_COBBLE.puddleDarken), w.a));
   const color = grassCol
     .mul(w.r)
     .add(at(gravel.diff, TILE.gravel).rgb.mul(w.g))
-    .add(at(cobble.diff, TILE.cobble).rgb.mul(w.b));
+    .add(cobbleCol.mul(w.b));
   // Night lawns read darker and colder than the daylight scans.
   m.colorNode = color.mul(mix(vec3(0.55, 0.62, 0.58), vec3(1), w.r.oneMinus()));
 
   const nor = at(grass.nor, TILE.grass).rgb.mul(w.r).add(at(gravel.nor, TILE.gravel).rgb.mul(w.g)).add(at(cobble.nor, TILE.cobble).rgb.mul(w.b));
-  m.normalNode = normalMap(nor);
+  m.normalNode = normalMap(mix(nor, vec3(0.5, 0.5, 1), puddle.mul(0.85)));
 
   const arm = at(grass.arm, TILE.grass).rgb.mul(w.r).add(at(gravel.arm, TILE.gravel).rgb.mul(w.g)).add(at(cobble.arm, TILE.cobble).rgb.mul(w.b));
   m.aoNode = arm.r;
-  // Damp night ground: everything a little glossier than the scans.
-  m.roughnessNode = arm.g.mul(0.85);
+  // Damp night ground: grass and gravel a little glossier than the scans; cobble wet, puddles glassy.
+  const cobbleRough: N = mix(float(WET_COBBLE.roughness), float(WET_COBBLE.puddleRoughness), w.a);
+  m.roughnessNode = arm.g.mul(0.85).mul(w.b.oneMinus()).add(cobbleRough.mul(w.b));
   m.metalnessNode = float(0);
   return m;
 }

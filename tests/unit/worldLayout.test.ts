@@ -146,3 +146,22 @@ describe('tree placement', () => {
     expect(placeTrees({ seed: 7 })).toEqual(trees);
   });
 });
+
+describe('puddleMask', () => {
+  it('is in [0, 1], deterministic, and covers a minority of the plaza', async () => {
+    const { puddleMask, PLAZA_CENTER } = await import('../../src/logic/worldLayout');
+    let wet = 0;
+    let n = 0;
+    for (let x = -30; x <= 30; x += 0.5)
+      for (let z = -30; z <= 30; z += 0.5) {
+        const m = puddleMask(PLAZA_CENTER.x + x, PLAZA_CENTER.z + z);
+        expect(m).toBeGreaterThanOrEqual(0);
+        expect(m).toBeLessThanOrEqual(1);
+        if (m > 0.5) wet++;
+        n++;
+      }
+    expect(puddleMask(3.3, -170.7)).toBe(puddleMask(3.3, -170.7));
+    expect(wet / n).toBeGreaterThan(0.08);
+    expect(wet / n).toBeLessThan(0.35);
+  });
+});

@@ -167,6 +167,20 @@ async function startGame(session: Session, sceneName: GameScene): Promise<void> 
         })
       : null;
   const world = garden ?? (await createFlatWorld(renderer, physics, effectiveGraphics(settings, backend)));
+  // The Act 0 plaza stands on the garden's plaza disc.
+  const plaza = garden
+    ? await (await import('./world/plaza')).createPlaza({
+        physics,
+        i18n,
+        rig: world.rig,
+        onJammerDisabled: () => director.markDisabled('jammer'),
+      })
+    : null;
+  if (garden && plaza) {
+    world.scene.add(plaza.root);
+    for (const [name, vp] of Object.entries(plaza.viewpoints)) garden.addViewpoint(name, vp);
+    world.fog.syncLights(); // the plaza's lamps join the fog (nearest ones, capped)
+  }
   const keyboard = new KeyboardInput(window, () => settings.get().bindings);
   const controller = new PlayerController(physics, world.camera, {
     input: () => keyboard.move(),
@@ -210,17 +224,50 @@ async function startGame(session: Session, sceneName: GameScene): Promise<void> 
     interactor.register(testCube.interactable);
   }
   let lock: import('./puzzles/cipherLock').CipherLock | undefined;
-  if (props.has('lock')) {
-    const { createLockProp } = await import('./world/lockProp');
-    lock = createLockProp(world.scene, physics, world.spawn, world.spawnYaw, {
-      director,
-      modal,
-      camera: world.camera,
-      canvas,
-      target: window,
-      bindings: () => settings.get().bindings,
-      i18n,
+  const lockDeps = {
+    director,
+    modal,
+    camera: world.camera,
+    canvas,
+    target: window,
+    bindings: () => settings.get().bindings,
+    i18n,
+  };
+  if (plaza) {
+    const [{ CipherLock }, { createDocumentInteractable }, { createPickup }] = await Promise.all([
+      import('./puzzles/cipherLock'),
+      import('./interaction/documents'),
+      import('./interaction/pickup'),
+    ]);
+    const pyr = plaza.pyramid;
+    lock = new CipherLock({ ...lockDeps, parts: pyr.lockParts });
+    interactor.register(lock.interactable);
+    interactor.register({
+      id: 'plaque',
+      promptKey: 'prompt.inspect',
+      object: pyr.plaque,
+      canInteract: () => true,
+      // After Fritz has translated the Latin, the inspect view shows its meaning.
+      interact: () =>
+        inspect.open(pyr.plaque, {
+          textKey: director.state().firedBeats.includes('b5_latin_translation') ? 'plaque.latin_meaning' : undefined,
+        }),
     });
+    interactor.register(pyr.jammer.interactable);
+    director.registerDisableable('jammer', () => pyr.jammer.disable(true));
+    interactor.register(createDocumentInteractable({ id: 'manifesto', docKey: 'vanguard_manifesto', object: pyr.manifesto }));
+    const part = createPickup({
+      id: 'ticket_printer_part',
+      itemId: 'ticket_printer_part',
+      object: pyr.ticketPart,
+      inventory,
+      onPicked: (id) => director.markDisabled(id),
+    });
+    interactor.register(part);
+    director.registerDisableable(part.id, part.markPicked);
+  } else if (props.has('lock')) {
+    const { createLockProp } = await import('./world/lockProp');
+    lock = createLockProp(world.scene, physics, world.spawn, world.spawnYaw, lockDeps);
     interactor.register(lock.interactable);
   }
 
@@ -244,7 +291,10 @@ async function startGame(session: Session, sceneName: GameScene): Promise<void> 
   world.scene.add(fritz.root);
   const sx = world.spawn.x;
   const sz = world.spawn.z;
-  if (props.has('perches')) {
+  if (plaza) {
+    await plaza.attachFritz(fritz);
+    fritz.place('lamp_3');
+  } else if (props.has('perches')) {
     fritz.addPerch('p1', new Vector3(sx - 6, 1.2, sz + 2), 90);
     fritz.addPerch('p2', new Vector3(sx + 6, 1.2, sz + 2), -90);
     fritz.addPerch('p3', new Vector3(sx + 0.5, 1.5, sz + 2), 180); // 2 m dead ahead, facing the player
@@ -254,12 +304,11 @@ async function startGame(session: Session, sceneName: GameScene): Promise<void> 
     fritz.place('home');
   }
 
-  // The active puzzle is the lock while the player is within 6 m of it (distance only; Task 13 replaces this stub with focus-aware logic).
-  const ACTIVE_RADIUS_M = 6;
+  // The active puzzle is the lock while the player is within 6 m of its door or focused on it.
+  const { lockIsActive } = await import('./logic/plazaLayout');
   let lockHint: import('./companion/fritz').HintablePuzzle | null = null;
   if (lock) {
-    const { addDummyPlaque } = await import('./world/lockProp');
-    const plaque = addDummyPlaque(lock);
+    const plaque = plaza ? plaza.pyramid.plaque : (await import('./world/lockProp')).addDummyPlaque(lock);
     lock.parts.innerRing.name = 'ring';
     for (const f of lock.parts.tumblerFaces) f.name = 'tumbler';
     lockHint = {
@@ -322,9 +371,21 @@ async function startGame(session: Session, sceneName: GameScene): Promise<void> 
       perch: () => fritz.currentPerch(),
       highlighted: () => fritz.highlightedObjects().map((o) => o.name),
       caws: () => cawCount,
+      perches: () => fritz.perchIds(),
     },
+    jammer: plaza ? {
+      state: () => plaza.pyramid.jammer.state(),
+      disable: () => plaza.pyramid.jammer.interactable.interact(),
+    } : undefined,
+    plaqueLocale: () => plaza?.pyramid.plaqueText.drawnLocale() ?? null,
+    activePuzzle: () => activePuzzle?.id ?? null,
+    fogLightCount: () => world.fog.scatteringLights().length,
     teleport: (x: number, z: number, yaw: number) => controller.teleport({ x, y: garden?.groundHeight(x, z) ?? 0, z }, yaw),
     viewpoint: (name: string | null) => garden?.setViewpoint(name) ?? false,
+    lookFrom: (position: [number, number, number], target: [number, number, number], fov = 40) => {
+      garden?.addViewpoint('debug', { position, lookAt: target, up: [0, 1, 0], fov, fogBypass: false });
+      return garden?.setViewpoint('debug') ?? false;
+    },
     cameraPose: () => {
       const dir = world.camera.getWorldDirection(new Vector3());
       const p = world.camera.position;
@@ -356,10 +417,11 @@ async function startGame(session: Session, sceneName: GameScene): Promise<void> 
     garden?.update(); // debug viewpoint override and tree LOD, every tick so a capped frame never shows the player camera
     lock?.update(dt);
     if (lockHint) {
-      const p = lock!.parts.root.position;
-      const near = Math.hypot(controller.position.x - p.x, controller.position.z - p.z) <= ACTIVE_RADIUS_M;
-      if (near !== (activePuzzle === lockHint)) setActivePuzzle(near ? lockHint : null);
+      const door = plaza ? plaza.pyramid.doorCenter : lock!.parts.root.position;
+      const active = lockIsActive(controller.position, door, lock!.state().focused);
+      if (active !== (activePuzzle === lockHint)) setActivePuzzle(active ? lockHint : null);
     }
+    plaza?.update(dt, world.camera.position);
     fritz.update(dt);
     interactor.update();
     const st = state.get();
@@ -380,11 +442,13 @@ async function startGame(session: Session, sceneName: GameScene): Promise<void> 
  */
 async function startMenu(session: Session): Promise<void> {
   const { renderer, settings, backend, i18n, save, director, meter } = session;
-  const [{ createMenuBackdrop }, { createMainMenu, createAutoPick }] = await Promise.all([
+  const [{ createMenuBackdrop }, { createMainMenu, createAutoPick }, { plazaBackdrop }] = await Promise.all([
     import('./render/menuBackdrop'),
     import('./ui/menu'),
+    import('./world/plazaBackdrop'),
   ]);
-  const backdrop = await createMenuBackdrop(renderer, effectiveGraphics(settings, backend));
+  // The menu background is the plaza from its `menu_orbit` viewpoint.
+  const backdrop = await createMenuBackdrop(renderer, effectiveGraphics(settings, backend), plazaBackdrop(i18n));
   const { world } = backdrop;
   const autoPick = createAutoPick(settings);
 

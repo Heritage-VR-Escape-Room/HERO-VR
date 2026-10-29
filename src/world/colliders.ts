@@ -119,6 +119,19 @@ export class PhysicsWorld {
     return this.addStatic(RAPIER.ColliderDesc.trimesh(vertices, indices), opts);
   }
 
+  /** Free the Rapier world (the menu backdrop's world is thrown away when the game starts). */
+  dispose(): void {
+    this.world.free();
+    this.data.clear();
+  }
+
+  /** Remove a static collider (e.g. a door that has opened). */
+  removeCollider(collider: RAPIER.Collider): void {
+    this.data.delete(collider.handle);
+    this.world.removeCollider(collider, false);
+    this.queriesStale = true;
+  }
+
   /** Closest hit along `dir` (normalised here) within `maxDist`, against colliders in `groupMask`. */
   raycast(origin: Vec3Like, dir: Vec3Like, maxDist: number, groupMask: number): RaycastHit | null {
     const len = Math.hypot(dir.x, dir.y, dir.z) || 1;

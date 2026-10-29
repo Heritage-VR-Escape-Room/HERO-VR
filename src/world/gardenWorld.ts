@@ -3,7 +3,8 @@
  * lake and fountain, railway, the Schloss) under the night lighting rig,
  * volumetric fog and post chain. The player starts on the plaza; the slice
  * blockers keep them within SLICE_RADIUS of it. The garden has no lamps of
- * its own (fog cost scales with lamp count); Task 13 adds the plaza's.
+ * its own (fog cost scales with lamp count); the plaza (world/plaza.ts) adds
+ * its ring of streetlamps.
  */
 import { PerspectiveCamera, Scene, Vector3, type WebGPURenderer } from 'three/webgpu';
 import { createLightingRig } from '../render/lighting';
@@ -56,6 +57,8 @@ export interface GardenWorld extends FlatWorld {
   setViewpoint(name: string | null): boolean;
   /** The viewpoint currently overriding the player camera, if any. */
   viewpoint(): string | null;
+  /** Register another named viewpoint (the plaza's). */
+  addViewpoint(name: string, vp: Viewpoint): void;
 }
 
 /** Tree detail tier for a graphics setting (Task 17 may give trees their own option). */
@@ -90,6 +93,7 @@ export async function createGardenWorld(
   const post = buildPost(renderer, scene, camera, opts, { fog, highlight });
 
   const [sx, , sz] = P.spawn.position;
+  const viewpoints: Record<string, Viewpoint> = { ...P.viewpoints };
   let active: string | null = null;
   const placeOnViewpoint = (vp: Viewpoint): void => {
     camera.position.set(...vp.position);
@@ -111,16 +115,16 @@ export async function createGardenWorld(
     spawnYaw: P.spawn.yaw,
     groundHeight: heightAt,
     update(): void {
-      if (active) placeOnViewpoint(P.viewpoints[active]!);
+      if (active) placeOnViewpoint(viewpoints[active]!);
       garden.update(camera);
     },
     applyDetail(next: GraphicsOptions): void {
       garden.setDetail(treeDetailLevel(next));
     },
     setViewpoint(name: string | null): boolean {
-      if (name !== null && !P.viewpoints[name]) return false;
+      if (name !== null && !viewpoints[name]) return false;
       active = name;
-      const vp = name ? P.viewpoints[name]! : null;
+      const vp = name ? viewpoints[name]! : null;
       camera.fov = vp?.fov ?? FOV;
       camera.far = vp ? DEBUG_FAR_M : FAR_M;
       camera.updateProjectionMatrix();
@@ -130,5 +134,8 @@ export async function createGardenWorld(
       return true;
     },
     viewpoint: () => active,
+    addViewpoint(name: string, vp: Viewpoint): void {
+      viewpoints[name] = vp;
+    },
   };
 }

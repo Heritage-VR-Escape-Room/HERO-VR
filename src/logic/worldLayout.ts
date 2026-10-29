@@ -144,6 +144,16 @@ function valueNoise(x: number, z: number): number {
 }
 
 /**
+ * Where rain water stands on the cobbles (0 dry .. 1 puddle): two octaves of
+ * value noise thresholded into irregular patches a few metres across.
+ * Baked into the terrain splat's alpha; the shader uses it only on cobble.
+ */
+export function puddleMask(x: number, z: number): number {
+  const n = valueNoise(x / 6.1 + 17.3, z / 6.1 - 4.1) * 0.7 + valueNoise(x / 2.3 - 8.8, z / 2.3 + 2.6) * 0.3;
+  return smoothstep(0.2, 0.36, n);
+}
+
+/**
  * Ground height: gentle ±0.5 m undulation, exactly 0 on paths, the forecourt
  * and the plaza (blended over a few metres), and the lake carved 1.5 m deep.
  */

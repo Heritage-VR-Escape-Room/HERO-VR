@@ -5,6 +5,8 @@ import de from '../../public/locales/de.json' with { type: 'json' };
 
 test.beforeEach(({}, info) => {
   test.skip(info.project.name !== 'default', 'menu specs run in the default project only');
+  // The menu backdrop is the full plaza (garden + plaza): its first frames compile for several seconds.
+  if (info.timeout < 120_000) test.setTimeout(120_000);
 });
 
 const tables = { en, ar, de } as Record<string, Record<string, string>>;
@@ -21,7 +23,7 @@ function collectErrors(page: Page): string[] {
 /** Boot to the main menu and wait until its background renders. */
 async function openMenu(page: Page, query = ''): Promise<void> {
   await page.goto(`/?test=1${query}`);
-  await page.waitForFunction(() => (window.__hero?.frames?.() ?? 0) > 10, undefined, { timeout: 60_000 });
+  await page.waitForFunction(() => (window.__hero?.frames?.() ?? 0) > 10, undefined, { timeout: 90_000 });
   await expect(page.locator('#menu')).toBeVisible();
 }
 
@@ -143,7 +145,10 @@ test('frame cap 30 → __hero.renderFps() between 27 and 31 over 3 s', async ({ 
   await openSettings(page, 'graphics');
   await page.click('#settings [data-field="frameCap"][data-value="30"]');
   expect((await settings(page)).custom?.frameCap).toBe(30);
-  await page.waitForTimeout(3500);
+  // The plaza backdrop recompiles after the settings change; measure once the 3 s window is past that stall.
+  await expect
+    .poll(() => page.evaluate(() => window.__hero!.renderFps!()), { timeout: 30_000, intervals: [3500, 1000] })
+    .toBeGreaterThanOrEqual(27);
   const fps = await page.evaluate(() => window.__hero!.renderFps!());
   expect(fps).toBeGreaterThanOrEqual(27);
   expect(fps).toBeLessThanOrEqual(31);
@@ -199,13 +204,13 @@ test('settings persist across reload', async ({ page }) => {
 });
 
 test('graphics changes rebuild the post chain without leaking textures', async ({ page }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(420_000); // each change recompiles the plaza backdrop's pipelines
   const errors = collectErrors(page);
   await openMenu(page);
   await openSettings(page, 'graphics');
   const frames = async (n: number): Promise<void> => {
     const s = await page.evaluate(() => window.__hero!.frames!());
-    await page.waitForFunction((t) => window.__hero!.frames!() > t, s + n, { timeout: 30_000 });
+    await page.waitForFunction((t) => window.__hero!.frames!() > t, s + n, { timeout: 60_000 });
   };
   const pick = async (field: string, value: string): Promise<void> => {
     await page.click(`#settings [data-field="${field}"][data-value="${value}"]`);

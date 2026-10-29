@@ -79,6 +79,7 @@ import {
   vec4,
 } from 'three/tsl';
 import { fogParams, type FogQuality } from '../logic/fogQuality';
+import { MAX_FOG_LIGHTS, pickFogLights } from '../logic/fogLights';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type N = any;
@@ -101,6 +102,10 @@ const FALLOFF_SCALE_M = 6;
 const VOLUME_HALF_XZ = 45;
 const VOLUME_BOTTOM_Y = -4;
 const VOLUME_TOP_Y = 30;
+/** Lights farther than this (horizontally) from the camera fall outside the fog box. */
+const LIGHT_REACH_M = VOLUME_HALF_XZ * Math.SQRT2;
+/** Re-pick the fog lights once the camera has moved this far since the last pick. */
+const RESYNC_MOVE_M = 8;
 /** Henyey-Greenstein anisotropy: forward scattering makes halos around lamps. */
 const PHASE_G = 0.45;
 /** Ambient radiance lighting the fog (skylight + diffuse moonlight), linear. */
@@ -500,6 +505,8 @@ export class VolumetricFog {
   private frame = 0;
   private resolveNode: FogResolveNode | null = null;
   private moon: DirectionalLight | null = null;
+  private fogLights: Light[] = [];
+  private readonly syncedAt = new Vector3();
   /** Debug-only switch (aerial view): composite passes the scene through. Density is untouched. */
   private readonly bypass = uniform(0);
   /** Post-pass nodes run on a fullscreen quad, so they read the real camera by reference. */
@@ -542,22 +549,41 @@ export class VolumetricFog {
     this.setQuality('High');
   }
 
-  /** Re-collect the lights that scatter in the fog (moon + every point/spot lamp). */
+  /**
+   * Re-collect the lights that scatter in the fog: the moon plus at most
+   * MAX_FOG_LIGHTS point/spot lights near the camera (see logic/fogLights).
+   * `update` re-picks them as the camera moves; the shader only rebuilds when
+   * the picked set actually changes.
+   */
   syncLights(): void {
-    const list: Light[] = [];
     let moon: DirectionalLight | null = null;
+    const candidates: Array<{ light: Light; x: number; y: number; z: number; halo: boolean }> = [];
+    const p = new Vector3();
     this.scene.traverse((o) => {
       const l = o as Light;
       if ((l as DirectionalLight).isDirectionalLight && !moon) moon = l as DirectionalLight;
-      if (((l as N).isPointLight || (l as N).isSpotLight) && l.userData.fogScatter !== false) list.push(l);
+      if (((l as N).isPointLight || (l as N).isSpotLight) && l.userData.fogScatter !== false) {
+        l.getWorldPosition(p);
+        candidates.push({ light: l, x: p.x, y: p.y, z: p.z, halo: (l as N).isPointLight === true });
+      }
     });
-    // The moon stays in the list so the lighting model always runs, even with no lamps.
-    if (moon) list.unshift(moon);
+    const c = this.camera.position;
+    this.syncedAt.copy(c);
+    const picked = pickFogLights(candidates, c, MAX_FOG_LIGHTS, LIGHT_REACH_M).map((e) => e.light);
+    const list: Light[] = moon ? [moon, ...picked] : picked;
+    this.moon = moon;
+    if (list.length === this.fogLights.length && list.every((l, i) => l === this.fogLights[i])) return;
+    this.fogLights = list;
     // The fog pass draws with only FOG_LAYER enabled; lights are layer-filtered too.
+    // The moon stays in the list so the lighting model always runs, even with no lamps.
     for (const l of list) l.layers.enable(FOG_LAYER);
     this.material.lightsNode = lights(list) as N;
     this.material.needsUpdate = true;
-    this.moon = moon;
+  }
+
+  /** The local lights currently scattering in the fog (moon excluded). */
+  scatteringLights(): readonly Light[] {
+    return this.fogLights.filter((l) => !(l as DirectionalLight).isDirectionalLight);
   }
 
   setQuality(q: FogQuality): void {
@@ -611,6 +637,7 @@ export class VolumetricFog {
   /** Per-frame update (before rendering): volume position, temporal jitter, moon. */
   update(): void {
     this.follow();
+    if (this.camera.position.distanceTo(this.syncedAt) > RESYNC_MOVE_M) this.syncLights();
     const temporal = fogParams(this.quality).temporal;
     const h = HALTON[this.frame++ % HALTON.length]!;
     this.inputs.jitter.value.set(temporal ? h[0] : 0, temporal ? h[1] : 0);

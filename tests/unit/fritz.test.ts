@@ -73,3 +73,68 @@ describe('findRig on the placeholder crow bone names', () => {
     expect(rig.head!.name).toBe('CROW__Head_05');
   });
 });
+
+describe('Fritz bird rig (world-axis wings, folded on the perch)', () => {
+  /** Left and right wing chains spread flat along +-X, like the crow's authored flight pose. */
+  function birdModel() {
+    const scene = new Object3D();
+    const chain = (side: 'L' | 'R', sx: number) => {
+      const names = [`CROW__${side}_Clavicle`, `CROW__${side}_UpperArm`, `CROW__${side}_Forearm`, `CROW__${side}_Hand`];
+      let parent: Object3D = scene;
+      const nodes = names.map((n, i) => {
+        const o = new Object3D();
+        o.name = n;
+        o.position.set(i === 0 ? sx * 0.05 : sx * 0.15, 0, 0);
+        parent.add(o);
+        parent = o;
+        return o;
+      });
+      const tip = new Object3D();
+      tip.position.set(sx * 0.3, 0, 0);
+      nodes[3]!.add(tip);
+      return tip;
+    };
+    const head = new Object3D();
+    head.name = 'CROW__Head';
+    scene.add(head);
+    return { gltf: { scene, animations: [] }, tipL: chain('L', 1), tipR: chain('R', -1) };
+  }
+  const world = (o: Object3D) => {
+    o.updateWorldMatrix(true, false);
+    return new Vector3().setFromMatrixPosition(o.matrixWorld);
+  };
+
+  it('folds both wing tips back along the body while perched', () => {
+    const f = makeFritz();
+    f.addPerch('a', new Vector3(0, 0, 0), 0);
+    f.place('a');
+    const m = birdModel();
+    const spreadL = world(m.tipL).x;
+    f.attachModel(m.gltf, { wingAxes: 'world' });
+    f.update(0.02);
+    const l = world(m.tipL);
+    const r = world(m.tipR);
+    expect(Math.abs(l.x)).toBeLessThan(spreadL * 0.4); // tucked in near the body
+    expect(l.z).toBeLessThan(0); // pointing back (Fritz faces +Z at bearing 0)
+    expect(r.z).toBeLessThan(0);
+    expect(l.x).toBeCloseTo(-r.x, 5); // mirror images
+  });
+
+  it('spreads and beats the wings about the body axis in flight', () => {
+    const f = makeFritz();
+    f.addPerch('a', new Vector3(0, 0, 0), 0);
+    f.addPerch('b', new Vector3(0, 0, 12), 0);
+    f.place('a');
+    const m = birdModel();
+    f.attachModel(m.gltf, { wingAxes: 'world' });
+    void f.flyTo('b');
+    const ys: number[] = [];
+    for (let i = 0; i < 20; i++) {
+      f.update(0.02);
+      ys.push(world(m.tipL).y - f.position.y);
+      const l = world(m.tipL).sub(f.position);
+      expect(Math.hypot(l.x, l.y)).toBeGreaterThan(0.4); // spread, not folded
+    }
+    expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(0.2);
+  });
+});

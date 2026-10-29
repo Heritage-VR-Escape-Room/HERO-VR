@@ -13,11 +13,12 @@ import { USED_KEYS as PAUSE_KEYS } from '../../src/ui/pause';
 import { USED_KEYS as SETTINGS_KEYS } from '../../src/ui/settingsScreen';
 import { USED_KEYS as CREDITS_KEYS } from '../../src/ui/credits';
 import { USED_KEYS as END_KEYS } from '../../src/ui/endCard';
+import { USED_KEYS as PLAZA_KEYS } from '../../src/logic/plazaLayout';
 
 const tables: Record<string, Record<string, string>> = { en, ar, de };
 
 const beatKeys = Object.values(BEATS).flatMap((lines) => lines.flatMap((l) => [l.speaker, l.text]));
-const used = [...new Set([...beatKeys, ...DIALOGUE_KEYS, ...ITEM_KEYS, ...PROMPT_KEYS, ...DOC_KEYS, ...INSPECT_KEYS, ...LOCK_KEYS, ...MENU_KEYS, ...PAUSE_KEYS, ...SETTINGS_KEYS, ...CREDITS_KEYS, ...END_KEYS])];
+const used = [...new Set([...beatKeys, ...DIALOGUE_KEYS, ...ITEM_KEYS, ...PROMPT_KEYS, ...DOC_KEYS, ...INSPECT_KEYS, ...LOCK_KEYS, ...MENU_KEYS, ...PAUSE_KEYS, ...SETTINGS_KEYS, ...CREDITS_KEYS, ...END_KEYS, ...PLAZA_KEYS])];
 
 describe('locales', () => {
   it('every key used in BEATS, hints, docs, items and ui exists in en, ar and de with non-empty values', () => {
@@ -38,6 +39,17 @@ describe('locales', () => {
       expect(BEATS[id]?.length, id).toBeGreaterThan(0);
     for (const k of ['hint.lock.1', 'hint.lock.2', 'hint.lock.3', 'hint.lock.4', 'item.ticket_printer_part', 'spk.julian', 'spk.fritz', 'spk.owner'])
       expect(used).toContain(k);
+  });
+
+  it('the Vanguard manifesto names the missiles, the portal train line and Port Said in every language', () => {
+    expect(en['doc.vanguard_manifesto.body']).toMatch(/missile/i);
+    expect(en['doc.vanguard_manifesto.body']).toMatch(/portal train line/);
+    expect(en['doc.vanguard_manifesto.body']).toMatch(/Port Said/);
+    expect(en['doc.vanguard_manifesto.body']).toMatch(/Vanguard Armaments/);
+    expect(de['doc.vanguard_manifesto.body']).toMatch(/Raketen/);
+    expect(de['doc.vanguard_manifesto.body']).toMatch(/Port Said/);
+    expect(ar['doc.vanguard_manifesto.body']).toMatch(/صواريخ/);
+    expect(ar['doc.vanguard_manifesto.body']).toMatch(/بورسعيد/);
   });
 
   it('the Latin line stays Latin in every locale', () => {

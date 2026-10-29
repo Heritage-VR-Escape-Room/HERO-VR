@@ -40,7 +40,7 @@ const WINDOW_BAY_M = 4.2;
 const FLOOR_M = 6;
 
 /** Box with UVs in metres on every face (u along the face, v up). */
-function meterBox(w: number, h: number, d: number): BoxGeometry {
+export function meterBox(w: number, h: number, d: number): BoxGeometry {
   const g = new BoxGeometry(w, h, d);
   const uvAttr = g.getAttribute('uv');
   // Face order: +x, -x, +y, -y, +z, -z; 4 vertices each.

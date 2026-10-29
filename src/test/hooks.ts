@@ -63,7 +63,21 @@ export interface HeroHooks {
     highlighted(): string[];
     /** Raven caws heard so far. */
     caws(): number;
+    /** Ids of every perch Fritz knows. */
+    perches?(): string[];
   };
+  /** The Vanguard jammer in the pyramid alcove (scene=garden). */
+  jammer?: {
+    state(): { light: boolean; hum: boolean; vent: boolean };
+    /** Shut it down as the interaction would (marks it disabled in the story). */
+    disable(): void;
+  };
+  /** Locale the plaque texture was last drawn in (scene=garden), null before fonts load. */
+  plaqueLocale?: () => string | null;
+  /** Id of the puzzle Fritz's hints currently address, or null. */
+  activePuzzle?: () => string | null;
+  /** Local lights currently scattering in the volumetric fog (capped). */
+  fogLightCount?: () => number;
   /** Press the hint action as if the key were pressed. */
   requestHint?: () => void;
   /** A copy of the current settings. */
@@ -78,6 +92,8 @@ export interface HeroHooks {
   teleport?: (x: number, z: number, yaw: number) => void;
   /** Override the camera with a named debug viewpoint (scene=garden: 'aerial'); null gives it back to the player. */
   viewpoint?: (name: string | null) => boolean;
+  /** Put the camera at `position` looking at `target` (a 'debug' viewpoint; scene=garden). */
+  lookFrom?: (position: [number, number, number], target: [number, number, number], fov?: number) => boolean;
   /** Camera position and unit view direction. */
   cameraPose?: () => { x: number; y: number; z: number; lookX: number; lookY: number; lookZ: number };
   /** Whether a debug view is bypassing the fog (the density never changes). */

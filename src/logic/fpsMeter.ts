@@ -15,18 +15,29 @@ export function createFpsMeter(windowMs = 3000) {
   };
 }
 
+/** A gap between frames this long is a stall (pipelines compiling), not the machine's frame rate. */
+export const BENCH_STALL_MS = 1000;
+
 /**
  * First-launch benchmark: ignores a warm-up (shader compiles), then counts
- * frames for `measureMs` and reports the average fps once.
+ * frames for `measureMs` and reports the average fps once. A stall (a frame
+ * gap of BENCH_STALL_MS or more, e.g. the first frames of a big scene
+ * compiling) restarts the warm-up, so stalls never count against the machine.
  */
 export function createBenchmark({ warmupMs, measureMs }: { warmupMs: number; measureMs: number }) {
   let start: number | null = null;
+  let last: number | null = null;
   let frames = 0;
   let finished = false;
   return {
     /** Feed every rendered frame; returns the average fps on the frame that completes the run, else null. */
     tick(t: number): number | null {
       if (finished) return null;
+      if (last !== null && t - last >= BENCH_STALL_MS) {
+        start = t;
+        frames = 0;
+      }
+      last = t;
       start ??= t;
       const from = start + warmupMs;
       if (t < from) return null;

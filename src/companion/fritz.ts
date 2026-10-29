@@ -7,7 +7,11 @@
  * The body is a low-poly placeholder with wing groups acting as "bones". Any
  * animation clip a loaded model lacks (`fly`, `perch`, `idle`, `caw`) is driven
  * procedurally instead: a 4 Hz wing flap for `fly`, head-tilt noise for `idle`.
- * `attachModel` is the seam for the real raven (Task 11).
+ * `attachModel` is the seam for the real raven (Task 11). With
+ * `wingAxes: 'world'` (the crow placeholder, whose bone axes are arbitrary)
+ * the wings beat about the body's long axis and fold back along the body
+ * while perched, driven by rotations about Fritz's own axes rather than a
+ * bone-local `rotation.z`.
  */
 import {
   AnimationMixer,
@@ -15,6 +19,7 @@ import {
   MathUtils,
   Mesh,
   MeshStandardMaterial,
+  Quaternion,
   SphereGeometry,
   ConeGeometry,
   BoxGeometry,
@@ -91,6 +96,63 @@ export function findRig(root: Object3D): Rig {
   return rig;
 }
 
+/** Options for an attached model. */
+export interface AttachOptions {
+  /** 'local' (default): wings flap on bone-local rotation.z. 'world': about Fritz's own axes, folded on the perch. */
+  wingAxes?: 'local' | 'world';
+}
+
+/** Wing chain and head of a bird rig driven by rotations about Fritz's own axes. */
+interface BirdRig {
+  wings: Array<{ side: 1 | -1; chain: Array<{ node: Object3D; rest: Quaternion }> }>;
+  head: { node: Object3D; rest: Quaternion } | undefined;
+}
+
+/**
+ * Folded-wing angles (radians), tuned on the crow placeholder: the whole wing
+ * swept back about Fritz's up axis, the forearm turned a little forward and
+ * the hand back (bigger folds tear the skinning), then rolled down against
+ * the flank about the forward axis.
+ */
+export const WING_FOLD = { sweep: 1.6, forearm: 0.6, hand: 0.7, droop: 0.45 } as const;
+const CHAIN = [/upper.?arm/i, /fore.?arm/i, /hand/i];
+
+function birdRig(rig: Rig): BirdRig {
+  const wings = rig.wings.map((w) => {
+    const chain = [{ node: w.node, rest: w.node.quaternion.clone() }];
+    let at: Object3D = w.node;
+    for (const re of CHAIN) {
+      let found: Object3D | undefined;
+      at.traverse((o) => {
+        if (!found && o !== at && re.test(o.name)) found = o;
+      });
+      if (!found) break;
+      chain.push({ node: found, rest: found.quaternion.clone() });
+      at = found;
+    }
+    return { side: w.side, chain };
+  });
+  return { wings, head: rig.head && { node: rig.head, rest: rig.head.quaternion.clone() } };
+}
+
+const _pq = new Quaternion();
+const _dq = new Quaternion();
+const _q = new Quaternion();
+const _axis = new Vector3();
+
+/** Set `node` to its rest pose turned by `delta` in world space. */
+function turnInWorld(node: Object3D, rest: Quaternion, delta: Quaternion): void {
+  node.quaternion.copy(rest);
+  if (!node.parent) {
+    node.quaternion.premultiply(delta);
+    return;
+  }
+  node.parent.getWorldQuaternion(_pq);
+  // local = parent^-1 * delta * parent * rest
+  node.quaternion.copy(_pq).invert().multiply(delta).multiply(_pq).multiply(rest);
+  node.updateMatrixWorld();
+}
+
 const CAW_SEC = 0.6;
 const PERCH_TO_IDLE_SEC = 2;
 const SAMPLES = 48;
@@ -102,6 +164,8 @@ export class Fritz {
   private readonly perches = new Map<string, Perch>();
   /** Bones the procedural fallback drives: the placeholder's groups, or nodes found on an attached model. */
   private rig: Rig;
+  /** Set when the attached model is driven about Fritz's own axes. */
+  private bird: BirdRig | undefined;
   private model: Object3D | undefined;
   private mixer: AnimationMixer | undefined;
   private readonly actions = new Map<FritzState, AnimationAction>();
@@ -178,6 +242,10 @@ export class Fritz {
     return [...this.highlighted];
   }
 
+  perchIds(): string[] {
+    return [...this.perches.keys()];
+  }
+
   addPerch(id: string, pos: Vector3, facingDeg: number): void {
     this.perches.set(id, { pos: pos.clone(), facingDeg });
   }
@@ -194,12 +262,13 @@ export class Fritz {
   }
 
   /** Swap the placeholder for a loaded model; clips named fly/perch/idle/caw replace procedural motion. */
-  attachModel(gltf: { scene: Object3D; animations: AnimationClip[] }): void {
+  attachModel(gltf: { scene: Object3D; animations: AnimationClip[] }, opts: AttachOptions = {}): void {
     this.placeholder.visible = false;
     this.model?.removeFromParent();
     this.model = gltf.scene;
     this.root.add(gltf.scene);
     this.rig = findRig(gltf.scene);
+    this.bird = opts.wingAxes === 'world' ? birdRig(this.rig) : undefined;
     this.mixer = new AnimationMixer(gltf.scene);
     this.actions.clear();
     for (const name of ['fly', 'perch', 'idle', 'caw'] as const) {
@@ -340,6 +409,10 @@ export class Fritz {
       this.root.rotation.z = 0;
     }
     if (this.model && this.actions.has(s)) return;
+    if (this.bird) {
+      this.poseBird(s);
+      return;
+    }
     const t = this.clock;
     const { wings, head, headRest, beak } = this.rig;
     const flap = Math.sin(t * 2 * Math.PI * FRITZ_FLAP_HZ) * 0.7;
@@ -350,5 +423,37 @@ export class Fritz {
       head.rotation.x = s === 'caw' ? -0.4 : 0;
     }
     if (beak) beak.rotation.x = s === 'caw' ? 0.35 * (0.5 + 0.5 * Math.sin(this.cawT * 30)) : 0;
+  }
+
+  /** Bird rig: beat about the body's long axis in flight, fold back along the body otherwise. */
+  private poseBird(s: FritzState): void {
+    const bird = this.bird!;
+    const t = this.clock;
+    this.root.updateWorldMatrix(true, false);
+    this.root.getWorldQuaternion(_q);
+    const fwd = new Vector3(0, 0, 1).applyQuaternion(_q);
+    const up = new Vector3(0, 1, 0).applyQuaternion(_q);
+    const right = new Vector3(1, 0, 0).applyQuaternion(_q);
+    const flap = Math.sin(t * 2 * Math.PI * FRITZ_FLAP_HZ) * 0.7;
+    const about = (axis: Vector3, angle: number, out = new Quaternion()): Quaternion => out.setFromAxisAngle(_axis.copy(axis), angle);
+    for (const w of bird.wings) {
+      const [shoulder, ...rest] = w.chain;
+      if (!shoulder) continue;
+      if (s === 'fly') {
+        turnInWorld(shoulder.node, shoulder.rest, about(fwd, w.side * flap, _dq));
+        for (const b of rest) b.node.quaternion.copy(b.rest);
+        continue;
+      }
+      // Sweep the arm back along the body (about up), then roll it down against the flank (about forward).
+      const sweep = about(fwd, w.side * WING_FOLD.droop).multiply(about(up, w.side * WING_FOLD.sweep));
+      turnInWorld(shoulder.node, shoulder.rest, sweep);
+      const fold = [0, -WING_FOLD.forearm, WING_FOLD.hand];
+      rest.forEach((b, i) => turnInWorld(b.node, b.rest, about(up, w.side * (fold[i] ?? 0), _dq)));
+    }
+    if (bird.head) {
+      const noise = s === 'idle' ? Math.sin(t * 1.3) * 0.3 + Math.sin(t * 2.9 + 1) * 0.1 : 0;
+      const d = about(up, noise).multiply(about(right, s === 'caw' ? 0.4 : 0));
+      turnInWorld(bird.head.node, bird.head.rest, d);
+    }
   }
 }
