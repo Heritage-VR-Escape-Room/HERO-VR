@@ -23,7 +23,6 @@ const highlighted = (page: Page) => page.evaluate(() => window.__hero!.fritz!.hi
 test('flies 12 m in <= 2.5 s', async ({ page }) => {
   const errors = await open(page, 'perches');
   expect(await page.evaluate(() => window.__hero!.fritz!.perch())).toBe('p1');
-  await page.screenshot({ path: 'test-results/fritz-perch.png' });
   const a = await page.evaluate(() => window.__hero!.fritz!.position());
   const { ms, flying } = await page.evaluate(async () => {
     const f = window.__hero!.fritz!;
@@ -79,5 +78,13 @@ test('no active puzzle -> nohint line', async ({ page }) => {
   await expect.poll(() => subtitle(page)).toContain('Patience, friend');
   expect(await highlighted(page)).toEqual([]);
   expect(await page.evaluate(() => window.__hero!.fritz!.caws())).toBe(1);
+  expect(errors).toEqual([]);
+});
+
+test('perched Fritz is visible 2 m ahead', async ({ page }) => {
+  const errors = await open(page, 'perches');
+  await page.evaluate(() => window.__hero!.fritz!.flyTo('p3'));
+  await page.waitForTimeout(1500); // settles into idle
+  await page.screenshot({ path: 'test-results/fritz-perch.png' });
   expect(errors).toEqual([]);
 });

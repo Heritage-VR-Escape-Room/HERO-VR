@@ -66,6 +66,31 @@ interface Flight {
   lastYaw: number;
 }
 
+interface Rig {
+  wings: Array<{ node: Object3D; side: 1 | -1; rest: number }>;
+  head: Object3D | undefined;
+  headRest: number;
+  beak: Object3D | undefined;
+}
+
+const WING_L = /wing.*(^|[^a-z])(l|left)([^a-z]|$)|(^|[^a-z])(l|left)([^a-z]|$).*wing/i;
+const WING_R = /wing.*(^|[^a-z])(r|right)([^a-z]|$)|(^|[^a-z])(r|right)([^a-z]|$).*wing/i;
+const HEAD = /head|neck/i;
+
+/** Find wing and head nodes by name; `head` prefers a node literally named head over a neck. */
+export function findRig(root: Object3D): Rig {
+  const rig: Rig = { wings: [], head: undefined, headRest: 0, beak: undefined };
+  root.traverse((o) => {
+    if (WING_L.test(o.name) && !rig.wings.some((w) => w.side === 1)) rig.wings.push({ node: o, side: 1, rest: o.rotation.z });
+    else if (WING_R.test(o.name) && !rig.wings.some((w) => w.side === -1)) rig.wings.push({ node: o, side: -1, rest: o.rotation.z });
+    else if (HEAD.test(o.name) && (!rig.head || /head/i.test(o.name))) {
+      rig.head = o;
+      rig.headRest = o.rotation.z;
+    }
+  });
+  return rig;
+}
+
 const CAW_SEC = 0.6;
 const PERCH_TO_IDLE_SEC = 2;
 const SAMPLES = 48;
@@ -75,9 +100,8 @@ export class Fritz {
   onSound: ((name: FritzSound) => void) | undefined;
 
   private readonly perches = new Map<string, Perch>();
-  private readonly wings: [Object3D, Object3D];
-  private readonly head: Object3D;
-  private readonly beak: Object3D;
+  /** Bones the procedural fallback drives: the placeholder's groups, or nodes found on an attached model. */
+  private rig: Rig;
   private model: Object3D | undefined;
   private mixer: AnimationMixer | undefined;
   private readonly actions = new Map<FritzState, AnimationAction>();
@@ -95,7 +119,7 @@ export class Fritz {
 
   constructor(private readonly deps: FritzDeps) {
     this.onSound = deps.onSound;
-    const mat = new MeshStandardMaterial({ color: '#5a3a24', roughness: 0.5, metalness: 0.4 });
+    const mat = new MeshStandardMaterial({ color: '#5a3a24', roughness: 0.5, metalness: 0.4, emissive: '#2a170a' });
     const g = new Group();
     const body = new Mesh(new SphereGeometry(0.11, 10, 8), mat);
     body.scale.set(0.8, 0.75, 1.5);
@@ -123,9 +147,15 @@ export class Fritz {
     const wr = wing(-1);
     g.add(body, head, tail, wl, wr);
     this.placeholder = g;
-    this.wings = [wl, wr];
-    this.head = head;
-    this.beak = beak;
+    this.rig = {
+      wings: [
+        { node: wl, side: 1, rest: -0.4 },
+        { node: wr, side: -1, rest: 0.4 },
+      ],
+      head,
+      headRest: 0,
+      beak,
+    };
     this.root.add(g);
     this.root.name = 'fritz';
     this.pose('perch');
@@ -169,6 +199,7 @@ export class Fritz {
     this.model?.removeFromParent();
     this.model = gltf.scene;
     this.root.add(gltf.scene);
+    this.rig = findRig(gltf.scene);
     this.mixer = new AnimationMixer(gltf.scene);
     this.actions.clear();
     for (const name of ['fly', 'perch', 'idle', 'caw'] as const) {
@@ -302,26 +333,22 @@ export class Fritz {
     this.root.rotation.z = this.bank;
   }
 
-  /** Drive the placeholder's bones for states the loaded clips don't cover. */
+  /** Drive the rig's bones for states the loaded clips don't cover (all of them for the placeholder). */
   private pose(s: FritzState): void {
     if (s !== 'fly') {
       this.root.rotation.x = 0;
       this.root.rotation.z = 0;
     }
-    if (this.actions.has(s) && this.model) return;
+    if (this.model && this.actions.has(s)) return;
     const t = this.clock;
-    const [wl, wr] = this.wings;
-    if (s === 'fly') {
-      const flap = Math.sin(t * 2 * Math.PI * FRITZ_FLAP_HZ) * 0.7;
-      wl.rotation.z = flap;
-      wr.rotation.z = -flap;
-    } else {
-      wl.rotation.z = -1.2;
-      wr.rotation.z = 1.2;
+    const { wings, head, headRest, beak } = this.rig;
+    const flap = Math.sin(t * 2 * Math.PI * FRITZ_FLAP_HZ) * 0.7;
+    for (const w of wings) w.node.rotation.z = w.rest + (s === 'fly' ? w.side * flap : 0);
+    if (head) {
+      const noise = Math.sin(t * 1.3) * 0.3 + Math.sin(t * 2.9 + 1) * 0.1;
+      head.rotation.z = headRest + (s === 'idle' ? noise : 0);
+      head.rotation.x = s === 'caw' ? -0.4 : 0;
     }
-    const noise = Math.sin(t * 1.3) * 0.3 + Math.sin(t * 2.9 + 1) * 0.1;
-    this.head.rotation.z = s === 'idle' ? noise : 0;
-    this.head.rotation.x = s === 'caw' ? -0.4 : 0;
-    this.beak.rotation.x = s === 'caw' ? 0.35 * (0.5 + 0.5 * Math.sin(this.cawT * 30)) : 0;
+    if (beak) beak.rotation.x = s === 'caw' ? 0.35 * (0.5 + 0.5 * Math.sin(this.cawT * 30)) : 0;
   }
 }

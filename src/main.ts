@@ -189,13 +189,14 @@ async function startFlat(
   if (props.has('perches')) {
     fritz.addPerch('p1', new Vector3(sx - 6, 1.2, sz + 2), 90);
     fritz.addPerch('p2', new Vector3(sx + 6, 1.2, sz + 2), -90);
+    fritz.addPerch('p3', new Vector3(sx + 0.5, 1.5, sz + 2), 180); // 2 m dead ahead, facing the player
     fritz.place('p1');
   } else {
     fritz.addPerch('home', new Vector3(sx + 1.5, 1.6, sz + 1.5), 0);
     fritz.place('home');
   }
 
-  // The active puzzle is the lock while the player is within 6 m of it (or has it focused).
+  // The active puzzle is the lock while the player is within 6 m of it (distance only; Task 13 replaces this stub with focus-aware logic).
   const ACTIVE_RADIUS_M = 6;
   let lockHint: import('./companion/fritz').HintablePuzzle | null = null;
   if (lock) {
