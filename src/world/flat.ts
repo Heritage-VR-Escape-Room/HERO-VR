@@ -16,6 +16,7 @@ import {
 import { createLightingRig, LAMP_COLOR, type LightingRig } from '../render/lighting';
 import { VolumetricFog } from '../render/fog';
 import { buildPost, type PostChain } from '../render/post';
+import { Highlight } from '../render/highlight';
 import { loadNightSky } from '../render/sky';
 import { addStreetlampMesh, LAMP_HEAD_Y } from '../render/fogtest';
 import type { GraphicsOptions } from '../logic/presets';
@@ -29,6 +30,7 @@ export interface FlatWorld {
   rig: LightingRig;
   fog: VolumetricFog;
   post: PostChain;
+  highlight: Highlight;
   spawn: Vec3Like;
   /** Spawn view bearing, degrees clockwise from north. */
   spawnYaw: number;
@@ -64,7 +66,8 @@ export async function createFlatWorld(
 
   const fog = new VolumetricFog(renderer, scene, camera);
   fog.setQuality(opts.fog);
-  const post = buildPost(renderer, scene, camera, opts, { fog });
+  const highlight = new Highlight(scene, camera);
+  const post = buildPost(renderer, scene, camera, opts, { fog, highlight });
 
-  return { scene, camera, rig, fog, post, spawn: { x: 0, y: 0, z: -36 }, spawnYaw: 0 };
+  return { scene, camera, rig, fog, post, highlight, spawn: { x: 0, y: 0, z: -36 }, spawnYaw: 0 };
 }

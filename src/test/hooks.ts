@@ -51,6 +51,21 @@ export interface HeroHooks {
   fireBeat?: (id: string) => boolean;
   storyState?: () => import('../logic/story').StoryState;
   dialoguePlaying?: () => boolean;
+  /** Override the game clock (seconds) used by hint timing; null restores real time. */
+  setClock?: (t: number | null) => void;
+  /** Companion Fritz (needs ?props=perches). */
+  fritz?: {
+    flyTo(id: string): Promise<void>;
+    state(): 'fly' | 'perch' | 'idle' | 'caw';
+    position(): { x: number; y: number; z: number };
+    perch(): string | null;
+    /** Names of the objects currently outlined by a hint. */
+    highlighted(): string[];
+    /** Raven caws heard so far. */
+    caws(): number;
+  };
+  /** Press the hint action as if the key were pressed. */
+  requestHint?: () => void;
   [key: string]: unknown;
 }
 

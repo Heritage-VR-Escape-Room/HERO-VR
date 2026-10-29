@@ -32,7 +32,7 @@ import { buildLockMeshes, LOCK_STEP_RAD, TUMBLER_COUNT, type LockParts } from '.
 
 export const LOCK_PUZZLE_ID = 'cipher_lock';
 export const LOCK_HINT_KEYS = ['hint.lock.1', 'hint.lock.2', 'hint.lock.3', 'hint.lock.4'] as const;
-export const USED_KEYS: readonly string[] = ['prompt.use', 'ui.lock.hint'];
+export const USED_KEYS: readonly string[] = ['prompt.use', 'ui.lock.hint', ...LOCK_HINT_KEYS];
 
 export const LOCK_TIMING = { blendSec: 0.5, shakeSec: 0.4, doorSec: 0.8, steamSec: 1.4 } as const;
 const DOOR_OPEN_RAD = -MathUtils.degToRad(110);

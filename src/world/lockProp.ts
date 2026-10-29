@@ -47,3 +47,15 @@ export function createLockProp(
   );
   return lock;
 }
+
+/** A stand-in founder's plaque above the lock panel (the real one arrives with the pyramid, Task 13). */
+export function addDummyPlaque(lock: CipherLock): Mesh {
+  const plaque = new Mesh(
+    new BoxGeometry(0.7, 0.3, 0.04),
+    new MeshStandardMaterial({ color: new Color('#6b4a2c'), roughness: 0.6, metalness: 0.5 }),
+  );
+  plaque.name = 'plaque';
+  plaque.position.set(0, 0.55, -0.01);
+  lock.parts.root.add(plaque);
+  return plaque;
+}

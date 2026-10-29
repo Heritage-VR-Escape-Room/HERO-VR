@@ -93,6 +93,7 @@ async function startFlat(
   params: URLSearchParams,
   inventory: Inventory,
   director: StoryDirector,
+  runner: DialogueRunner,
 ): Promise<void> {
   const [
     { PhysicsWorld },
@@ -143,14 +144,15 @@ async function startFlat(
   });
   const prompt = createInteractPrompt(i18n, () => codeLabel(settings.get().bindings.interact));
   interactor.onFocusChange((i) => prompt.show(i?.promptKey ?? null));
+  const props = new Set((params.get('props') ?? '').split(',').filter(Boolean));
   let testCube: import('./world/testCube').TestCube | undefined;
-  if (params.get('props') === 'testcube') {
+  if (props.has('testcube')) {
     const { createTestCube } = await import('./world/testCube');
     testCube = createTestCube(world.scene, physics, (mesh) => inspect.open(mesh));
     interactor.register(testCube.interactable);
   }
   let lock: import('./puzzles/cipherLock').CipherLock | undefined;
-  if (params.get('props') === 'lock') {
+  if (props.has('lock')) {
     const { createLockProp } = await import('./world/lockProp');
     lock = createLockProp(world.scene, physics, world.spawn, world.spawnYaw, {
       director,
@@ -163,6 +165,60 @@ async function startFlat(
     });
     interactor.register(lock.interactable);
   }
+
+  // Companion Fritz: perches come from ?props=perches, otherwise he sits at a home perch.
+  const [{ Fritz }, { createHintScheduler }, { LOCK_HINT_KEYS, LOCK_PUZZLE_ID }, { Vector3 }] = await Promise.all([
+    import('./companion/fritz'),
+    import('./logic/hints'),
+    import('./puzzles/cipherLock'),
+    import('three/webgpu'),
+  ]);
+  let clockOverride: number | null = null;
+  const now = (): number => clockOverride ?? performance.now() / 1000;
+  let cawCount = 0;
+  const fritz = new Fritz({
+    runner,
+    director,
+    highlight: world.highlight,
+    now,
+    onSound: () => cawCount++,
+  });
+  world.scene.add(fritz.root);
+  const sx = world.spawn.x;
+  const sz = world.spawn.z;
+  if (props.has('perches')) {
+    fritz.addPerch('p1', new Vector3(sx - 6, 1.2, sz + 2), 90);
+    fritz.addPerch('p2', new Vector3(sx + 6, 1.2, sz + 2), -90);
+    fritz.place('p1');
+  } else {
+    fritz.addPerch('home', new Vector3(sx + 1.5, 1.6, sz + 1.5), 0);
+    fritz.place('home');
+  }
+
+  // The active puzzle is the lock while the player is within 6 m of it (or has it focused).
+  const ACTIVE_RADIUS_M = 6;
+  let lockHint: import('./companion/fritz').HintablePuzzle | null = null;
+  if (lock) {
+    const { addDummyPlaque } = await import('./world/lockProp');
+    const plaque = addDummyPlaque(lock);
+    lock.parts.innerRing.name = 'ring';
+    for (const f of lock.parts.tumblerFaces) f.name = 'tumbler';
+    lockHint = {
+      id: LOCK_PUZZLE_ID,
+      hintKeys: LOCK_HINT_KEYS,
+      scheduler: createHintScheduler(LOCK_HINT_KEYS.length),
+      targets: [[plaque], [plaque], [lock.parts.innerRing], lock.parts.tumblerFaces],
+    };
+  }
+  let activePuzzle: import('./companion/fritz').HintablePuzzle | null = null;
+  const setActivePuzzle = (p: import('./companion/fritz').HintablePuzzle | null): void => {
+    activePuzzle = p;
+  };
+  const requestHint = (): void => fritz.hint(activePuzzle);
+  window.addEventListener('keydown', (e) => {
+    if (e.repeat || e.code !== settings.get().bindings.hint || state.get() !== 'playing') return;
+    requestHint();
+  });
 
   // The post chain is built once; only the frame cap follows settings live.
   let frameCap = effectiveGraphics(settings, backend).frameCap;
@@ -190,6 +246,16 @@ async function startFlat(
     inventory: () => [...inventory.items()],
     placeTestCube: (d: number) => testCube?.place(world.camera, d),
     lockTumblerPoints: () => lock?.tumblerScreenPoints() ?? [],
+    setClock: (t: number | null) => (clockOverride = t),
+    requestHint,
+    fritz: {
+      flyTo: (id: string) => fritz.flyTo(id),
+      state: () => fritz.state,
+      position: () => ({ x: fritz.position.x, y: fritz.position.y, z: fritz.position.z }),
+      perch: () => fritz.currentPerch(),
+      highlighted: () => fritz.highlightedObjects().map((o) => o.name),
+      caws: () => cawCount,
+    },
     lock: lock && {
       rotate: (n: number) => lock.rotate(n),
       setTumblers: (s: string) => lock.setTumblers(s),
@@ -210,6 +276,12 @@ async function startFlat(
     });
     controller.update(dt, alpha);
     lock?.update(dt);
+    if (lockHint) {
+      const p = lock!.parts.root.position;
+      const near = Math.hypot(controller.position.x - p.x, controller.position.z - p.z) <= ACTIVE_RADIUS_M;
+      if (near !== (activePuzzle === lockHint)) setActivePuzzle(near ? lockHint : null);
+    }
+    fritz.update(dt);
     interactor.update();
     if (!shouldRender(t, lastRender, frameCap)) return;
     lastRender = t;
@@ -258,7 +330,7 @@ async function boot(): Promise<void> {
 
   const scene = params.get('scene');
   if (scene === 'fogtest') await startFogTest(renderer, params, backend);
-  else if (scene === 'flat') await startFlat(renderer, canvas, settings, backend, i18n, params, inventory, director);
+  else if (scene === 'flat') await startFlat(renderer, canvas, settings, backend, i18n, params, inventory, director, runner);
 
   console.log(`HERO_READY backend=${backend}`);
 }
