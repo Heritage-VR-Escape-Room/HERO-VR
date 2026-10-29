@@ -95,7 +95,8 @@ lines = [
 ]
 for r in rows:
     lic = r["license"].replace("SIL Open Font License", "OFL")
-    lines.append(f"| {r['asset']} | `{r['file']}` | {r['source']} | {r['author']} | {lic} |")
+    cells = [r["asset"], f"`{r['file']}`", r["source"], r["author"], lic]
+    lines.append("| " + " | ".join(c.replace("|", r"\|") for c in cells) + " |")
 lines += ["", "## Notes", ""] + [f"- {n}" for n in NOTES] + [""]
 (ROOT / "ASSET_CREDITS.md").write_text("\n".join(lines), encoding="utf-8")
 print(f"{len(rows)} credit rows")

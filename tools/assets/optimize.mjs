@@ -2,16 +2,18 @@
 //   node tools/assets/optimize.mjs [--only slug ...]
 //
 // Models:   raw glb -> Blender fix_transform.py (size, pivot, facing) -> gltf-transform simplify (only when over
-//           the entry's maxTris budget) -> gltf-transform optimize (meshopt + KTX2).
-// Textures: Poly Haven JPG maps -> WebP (and KTX2 when toktx is installed, see below).
+//           the entry's maxTris budget) -> gltf-transform optimize (meshopt; textures per ktx2Plan.mjs).
+// Textures: Poly Haven JPG maps -> WebP always (these standalone maps are never KTX2).
 //
-// KTX2 needs the `toktx` binary (KTX-Software). When it is not on PATH, textures fall back to WebP; the runtime
-// loader (src/world/assets.ts) handles both, so the swap is a re-run of this script once toktx is installed.
+// Model textures: without the `toktx` binary (KTX-Software) they become WebP (what ships now). If toktx is on PATH,
+// re-running this script for a model GLB instead writes KTX2: UASTC for normal maps, ETC1S for the other slots.
+// Standalone texture sets (tex_*) stay WebP either way. The runtime loader handles both formats.
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
+import { texturePlan } from './ktx2Plan.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..', '..');
@@ -22,7 +24,8 @@ const manifest = JSON.parse(readFileSync(join(here, 'manifest.json'), 'utf8'));
 const only = process.argv.includes('--only') ? process.argv.slice(process.argv.indexOf('--only') + 1) : null;
 
 const hasToktx = spawnSync('toktx --version', { shell: true }).status === 0;
-const textureCompress = hasToktx ? 'ktx2' : 'webp';
+const plan = texturePlan(hasToktx);
+const textureCompress = hasToktx ? 'ktx2 (uastc normals, etc1s rest)' : 'webp';
 
 function run(cmd, args, label) {
   const r = spawnSync(cmd, args, { encoding: 'utf8', maxBuffer: 1 << 28 });
@@ -77,7 +80,13 @@ function optimizeModel(e) {
   rmSync(outDir, { recursive: true, force: true });
   mkdirSync(outDir, { recursive: true });
   const out = join(outDir, `${e.slug}.glb`);
-  const oargs = ['optimize', input, out, '--compress', 'meshopt', '--texture-compress', textureCompress,
+  // With toktx: KTX2 passes run before `optimize` (UASTC for normal maps, ETC1S for the rest).
+  plan.passes.forEach((pass, i) => {
+    const next = join(cache, 'fixed', `${e.slug}.${pass.command}${i}.glb`);
+    gt(pass.command, input, next, '--slots', pass.slots);
+    input = next;
+  });
+  const oargs = ['optimize', input, out, '--compress', 'meshopt', '--texture-compress', plan.optimizeTextureCompress,
     '--palette', 'false', '--simplify', 'false'];
   if (skinned) oargs.push('--join', 'false');
   gt(...oargs);
