@@ -133,7 +133,8 @@ export function createAutoPick(settings: {
   onChange(cb: (s: Settings) => void): () => void;
 }): AutoPick {
   const bench = createBenchmark(AUTO_PICK);
-  if (settings.get().presetAutoPicked) bench.cancel();
+  // No benchmark once picked, or when the player already chose graphics themselves.
+  if (settings.get().presetAutoPicked || settings.get().custom) bench.cancel();
   const graphicsOf = (s: Settings): string => JSON.stringify([s.preset, s.custom]);
   const startGraphics = graphicsOf(settings.get());
   const unsub = settings.onChange((s) => {

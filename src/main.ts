@@ -537,6 +537,15 @@ async function startMenu(session: Session): Promise<void> {
     onNewGame: () => enterGame(false),
   });
   menu.show();
+  // A preset chosen here is the player's: the game's first-launch auto-pick then stays out of it.
+  const graphicsOf = (x: ReturnType<SettingsService['get']>): string => JSON.stringify([x.preset, x.custom]);
+  let lastGraphics = graphicsOf(session.settings.get());
+  session.settings.onChange((x) => {
+    const g = graphicsOf(x);
+    if (g === lastGraphics) return;
+    lastGraphics = g;
+    if (!x.presetAutoPicked) session.settings.update({ presetAutoPicked: true });
+  });
   // Menu sounds: hover ticks and clicks on every button, a soft drone once audio may start.
   const { audio } = session;
   document.addEventListener('mouseover', (e) => {

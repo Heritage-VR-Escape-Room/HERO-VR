@@ -39,6 +39,8 @@ test('aerial view', async ({ page }) => {
 test('ground view from the plaza looking north', async ({ page }) => {
   test.setTimeout(120_000);
   const errors = await open(page);
+  // The game starts on the wake bench; stand at the garden's own spawn, looking north.
+  await page.evaluate(() => window.__hero!.teleport!(0, -150, 0));
   const p = await page.evaluate(() => window.__hero!.playerPos!());
   expect(p.x).toBeCloseTo(0, 1);
   expect(p.z).toBeCloseTo(-150, 1);

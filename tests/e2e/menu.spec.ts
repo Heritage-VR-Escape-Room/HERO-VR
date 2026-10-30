@@ -5,7 +5,7 @@ import de from '../../public/locales/de.json' with { type: 'json' };
 
 test.beforeEach(({}, info) => {
   test.skip(info.project.name !== 'default', 'menu specs run in the default project only');
-  // The menu backdrop is the full plaza (garden + plaza): its first frames compile for several seconds.
+  // Continue and the frame-cap test load the game world, whose first frames compile for several seconds.
   if (info.timeout < 120_000) test.setTimeout(120_000);
 });
 
@@ -20,10 +20,10 @@ function collectErrors(page: Page): string[] {
   return errors;
 }
 
-/** Boot to the main menu and wait until its background renders. */
+/** Boot to the main menu (a still backdrop; no 3D world). */
 async function openMenu(page: Page, query = ''): Promise<void> {
   await page.goto(`/?test=1${query}`);
-  await page.waitForFunction(() => (window.__hero?.frames?.() ?? 0) > 10, undefined, { timeout: 90_000 });
+  await page.waitForFunction(() => window.__hero?.menuOpen?.() === true, undefined, { timeout: 60_000 });
   await expect(page.locator('#menu')).toBeVisible();
 }
 
@@ -94,7 +94,8 @@ test('valid save → Continue shown and restores the story', async ({ page }) =>
   await openMenu(page);
   await expect(page.locator('#menu-continue')).toBeVisible();
   await page.click('#menu-continue');
-  await page.waitForFunction(() => window.__hero!.playerPos !== undefined, undefined, { timeout: 60_000 });
+  // Continue loads the game on a fresh page.
+  await page.waitForFunction(() => window.__hero?.playerPos !== undefined, undefined, { timeout: 90_000 });
   await expect(page.locator('#menu')).toBeHidden();
   const story = await page.evaluate(() => window.__hero!.storyState!());
   expect(story.firedBeats).toContain('b1_wake');
@@ -145,7 +146,10 @@ test('frame cap 30 → __hero.renderFps() between 27 and 31 over 3 s', async ({ 
   await openSettings(page, 'graphics');
   await page.click('#settings [data-field="frameCap"][data-value="30"]');
   expect((await settings(page)).custom?.frameCap).toBe(30);
-  // The plaza backdrop recompiles after the settings change; measure once the 3 s window is past that stall.
+  // The menu draws no 3D: the cap is measured in the game (the setting persists).
+  await page.goto('/?test=1&scene=garden');
+  await page.waitForFunction(() => (window.__hero?.frames?.() ?? 0) > 10, undefined, { timeout: 90_000 });
+  // Measure once the 3 s window is past the first-frame compile stall.
   await expect
     .poll(() => page.evaluate(() => window.__hero!.renderFps!()), { timeout: 30_000, intervals: [3500, 1000] })
     .toBeGreaterThanOrEqual(27);
