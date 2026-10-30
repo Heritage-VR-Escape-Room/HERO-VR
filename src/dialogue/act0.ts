@@ -46,7 +46,9 @@ export function createAct0(d: Act0Deps): Act0 {
       director.fire('b5_latin_translation');
     },
     manifestoRead() {
+      if (director.state().disabledObjects.includes(MANIFESTO_READ)) return;
       director.markDisabled(MANIFESTO_READ);
+      director.autosave(MANIFESTO_READ);
     },
     update(player, lockSolved) {
       if (Math.hypot(player.x - d.kiosk.x, player.z - d.kiosk.z) <= KIOSK_RADIUS_M) director.fire('b2_newsstand');

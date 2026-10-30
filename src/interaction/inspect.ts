@@ -7,6 +7,7 @@
 import {
   AmbientLight,
   Box3,
+  Color,
   DirectionalLight,
   Group,
   MathUtils,
@@ -42,6 +43,8 @@ export class InspectView {
   private readonly hint: HTMLDivElement;
   private readonly caption: HTMLDivElement;
   private distance: number = INSPECT.distance;
+  /** Distance at which the object fills the view; zoom limits scale with it. */
+  private fit: number = INSPECT.distance;
   private dragging = false;
   private active = false;
   private textKey: string | undefined;
@@ -64,13 +67,15 @@ export class InspectView {
   };
   private readonly onWheel = (e: WheelEvent): void => {
     e.preventDefault();
-    this.distance = MathUtils.clamp(this.distance + e.deltaY * INSPECT.zoomStep, INSPECT.minDistance, INSPECT.maxDistance);
+    this.distance = MathUtils.clamp(this.distance + e.deltaY * INSPECT.zoomStep * (this.fit / INSPECT.distance), this.fit * (INSPECT.minDistance / INSPECT.distance), this.fit * (INSPECT.maxDistance / INSPECT.distance));
     this.pivot.position.z = -this.distance;
   };
   private readonly onContext = (e: Event): void => e.preventDefault();
 
   constructor(private readonly deps: InspectDeps) {
     this.cam = new PerspectiveCamera(deps.camera.fov, deps.camera.aspect, 0.05, 5);
+    // The examined object sits on a dark backdrop of its own (the world is not drawn behind it).
+    this.scene.background = new Color(0x0d0f11);
     this.scene.add(new AmbientLight(0xffffff, 0.9));
     const key = new DirectionalLight(0xfff0d8, 2.2);
     key.position.set(-0.6, 1, 0.8);
@@ -87,19 +92,22 @@ export class InspectView {
   open(source: Object3D, opts: { textKey?: string } = {}): void {
     if (this.active) return;
     this.active = true;
-    this.buildClone(source);
-    this.distance = INSPECT.distance;
-    this.pivot.position.set(0, 0, -this.distance);
     this.cam.fov = this.deps.camera.fov;
     this.cam.aspect = this.deps.camera.aspect;
     this.cam.updateProjectionMatrix();
+    const radius = this.buildClone(source);
+    // Small props sit at the default distance; big ones (the plaque) back off to fit.
+    const halfFov = MathUtils.degToRad(this.cam.fov / 2) * Math.min(1, this.cam.aspect);
+    this.fit = Math.max(INSPECT.distance, (radius / Math.sin(halfFov)) * 1.05);
+    this.distance = this.fit;
+    this.pivot.position.set(0, 0, -this.distance);
 
     this.textKey = opts.textKey;
     this.unsubLocale = this.deps.i18n.onChange(() => this.renderText());
     this.renderText();
 
     this.deps.modal.enter();
-    this.deps.post.setDofFocus(INSPECT.distance);
+    this.deps.post.setDofFocus(this.distance);
     window.addEventListener('keydown', this.onKey);
     window.addEventListener('mousedown', this.onDown);
     window.addEventListener('mouseup', this.onUp);
@@ -153,7 +161,8 @@ export class InspectView {
     this.caption.style.display = this.textKey ? 'block' : 'none';
   }
 
-  private buildClone(source: Object3D): void {
+  /** Returns the clone's bounding radius (m). */
+  private buildClone(source: Object3D): number {
     this.disposeClone();
     source.updateWorldMatrix(true, true);
     const worldScale = source.getWorldScale(new Vector3());
@@ -169,10 +178,14 @@ export class InspectView {
     clone.scale.copy(worldScale);
     clone.updateMatrixWorld(true);
     // Centre the visual on the pivot so it spins about its own middle.
-    const centre = new Box3().setFromObject(clone).getCenter(new Vector3());
-    clone.position.sub(centre);
-    this.pivot.rotation.set(0.35, -0.5, 0);
+    const box = new Box3().setFromObject(clone);
+    clone.position.sub(box.getCenter(new Vector3()));
+    // Large flat things (plaques, signs) start nearly face-on so they read; small props at an angle.
+    const radius = box.getSize(new Vector3()).length() / 2;
+    if (radius > 0.4) this.pivot.rotation.set(0.08, -0.15, 0);
+    else this.pivot.rotation.set(0.35, -0.5, 0);
     this.pivot.add(clone);
+    return radius;
   }
 
   private disposeClone(): void {

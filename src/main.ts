@@ -1,6 +1,6 @@
 import './render/fonts';
 import './ui/styles.css';
-import { createRenderer, type Backend } from './render/renderer';
+import { createRenderer, SHADOW_STAGE_TEXTURES, type Backend } from './render/renderer';
 import { installHooks, installI18nHooks } from './test/hooks';
 import { createI18n, isLocale, loadTables } from './logic/i18n';
 import { isFogQuality, type FogQuality } from './logic/fogQuality';
@@ -123,10 +123,18 @@ async function startFogTest(renderer: WebGPURenderer, params: URLSearchParams, b
   });
 }
 
-/** The player's graphics settings; WebGL2 always runs the cheapest fog tier. */
+/** Textures per shader stage the device allows (set at boot). */
+let stageTextures = 32;
+
+/**
+ * The player's graphics settings, limited by the device: WebGL2 always runs
+ * the cheapest fog tier, and devices with few textures per shader stage keep
+ * shadows at Low (the terrain shader would fail to compile otherwise).
+ */
 function effectiveGraphics(settings: SettingsService, backend: Backend): GraphicsOptions {
   const g = settings.effectiveGraphics();
-  return backend === 'webgl2' ? { ...g, fog: 'WebGL2Safe' } : g;
+  const shadows = stageTextures < SHADOW_STAGE_TEXTURES && (g.shadows === 'Medium' || g.shadows === 'High') ? 'Low' : g.shadows;
+  return { ...g, shadows, fog: backend === 'webgl2' ? 'WebGL2Safe' : g.fog };
 }
 
 type GameScene = 'flat' | 'garden';
@@ -181,7 +189,10 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
         physics,
         i18n,
         rig: world.rig,
-        onJammerDisabled: () => director.markDisabled('jammer'),
+        onJammerDisabled: () => {
+          director.markDisabled('jammer');
+          director.autosave('jammer');
+        },
       })
     : null;
   if (garden && plaza) {
@@ -279,7 +290,10 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
       itemId: 'ticket_printer_part',
       object: pyr.ticketPart,
       inventory,
-      onPicked: (id) => director.markDisabled(id),
+      onPicked: (id) => {
+        director.markDisabled(id);
+        director.autosave(id);
+      },
     });
     interactor.register(part);
     director.registerDisableable(part.id, part.markPicked);
@@ -542,16 +556,18 @@ async function boot(): Promise<void> {
     lastLocale = s.locale;
     i18n.setLocale(s.locale);
   });
-  const { renderer, backend } = await createRenderer(canvas, {
+  const created = await createRenderer(canvas, {
     forceWebGL,
     trackTimestamp: false,
   });
+  const { renderer, backend } = created;
+  stageTextures = created.stageTextures;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.setClearColor(0x8e9a86, 1);
   renderer.clear();
   window.addEventListener('resize', () => renderer.setSize(window.innerWidth, window.innerHeight, false));
-  installHooks({ backend });
+  installHooks({ backend, stageTextures: () => stageTextures });
   installI18nHooks(i18n);
   setAssetRenderer(renderer);
   setTextureBudget(textureResFor(settings.get().preset));

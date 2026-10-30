@@ -14,6 +14,9 @@ export interface RendererOptions {
  */
 export const WANTED_STAGE_TEXTURES = 32;
 
+/** Below this many textures per shader stage, shadows above 'Low' fail to compile on the terrain. */
+export const SHADOW_STAGE_TEXTURES = 20;
+
 /** Raise the per-stage texture/sampler limits as far as the adapter allows (at most WANTED_STAGE_TEXTURES). */
 export async function stageLimits(): Promise<Record<string, number>> {
   const adapter = await navigator.gpu?.requestAdapter().catch(() => null);
@@ -28,7 +31,7 @@ export async function stageLimits(): Promise<Record<string, number>> {
 export async function createRenderer(
   canvas: HTMLCanvasElement,
   opts: RendererOptions,
-): Promise<{ renderer: WebGPURenderer; backend: Backend }> {
+): Promise<{ renderer: WebGPURenderer; backend: Backend; stageTextures: number }> {
   const renderer = new WebGPURenderer({
     canvas,
     antialias: false,
@@ -37,6 +40,15 @@ export async function createRenderer(
     requiredLimits: opts.forceWebGL ? {} : await stageLimits(),
   } as ConstructorParameters<typeof WebGPURenderer>[0]);
   await renderer.init();
-  const isWebGPU = (renderer.backend as unknown as { isWebGPUBackend?: boolean }).isWebGPUBackend === true;
-  return { renderer, backend: isWebGPU ? 'webgpu' : 'webgl2' };
+  const be = renderer.backend as unknown as {
+    isWebGPUBackend?: boolean;
+    device?: { limits: { maxSampledTexturesPerShaderStage: number; maxSamplersPerShaderStage: number } };
+    gl?: WebGL2RenderingContext;
+  };
+  const isWebGPU = be.isWebGPUBackend === true;
+  // Textures one fragment shader may sample on this device (the terrain at High needs ~20).
+  const stageTextures = isWebGPU
+    ? Math.min(be.device?.limits.maxSampledTexturesPerShaderStage ?? 16, be.device?.limits.maxSamplersPerShaderStage ?? 16)
+    : ((be.gl?.getParameter(be.gl.MAX_TEXTURE_IMAGE_UNITS) as number | undefined) ?? 16);
+  return { renderer, backend: isWebGPU ? 'webgpu' : 'webgl2', stageTextures };
 }
