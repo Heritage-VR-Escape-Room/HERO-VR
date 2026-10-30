@@ -651,7 +651,7 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
   const autoPick = (await import('./ui/menu')).createAutoPick(settings);
 
   // Gamepad buttons drive the same paths as the keyboard and mouse.
-  const LOOK_PX_PER_SEC = 900; // mouse-pixel equivalent at full stick
+  const LOOK_PX_PER_SEC = 420; // mouse-pixel equivalent at full stick, scaled by the mouse sensitivity setting
   let padOutline = false;
   let padAnnounced = false;
   const handlePad = (dt: number): void => {

@@ -25,6 +25,9 @@ export const PAD = {
 } as const;
 
 export const DEAD_ZONE = 0.18;
+/** Menu key-repeat: a held direction steps once, then again after 0.5 s, then every 0.25 s. */
+export const NAV_FIRST_REPEAT_SEC = 0.5;
+export const NAV_REPEAT_SEC = 0.25;
 
 /** Radial dead zone, rescaled to 0..1 beyond it. */
 export function deadzone(x: number, y: number, dz = DEAD_ZONE): { x: number; y: number } {
@@ -42,9 +45,8 @@ export class Gamepads {
   private axes: readonly number[] = [];
   private connectedPad = false;
   private lastUse = -Infinity;
-  /** Stick repeat timer for menu navigation. */
-  private navT = 0;
-  private navDir = 0;
+  /** Key-repeat state per navigation axis (they must not share one, or each resets the other every frame). */
+  private readonly navState = { vertical: { dir: 0, t: 0 }, horizontal: { dir: 0, t: 0 } };
 
   constructor(private readonly source: PadSource = () => (navigator.getGamepads ? navigator.getGamepads() : [])) {}
 
@@ -105,18 +107,19 @@ export class Gamepads {
     const [neg, pos, ai] = axis === 'vertical' ? [PAD.UP, PAD.DOWN, 1] : [PAD.LEFT, PAD.RIGHT, 0];
     const a = this.axes[ai] ?? 0;
     const dir = this.isDown(neg) || a < -0.6 ? -1 : this.isDown(pos) || a > 0.6 ? 1 : 0;
+    const st = this.navState[axis];
     if (dir === 0) {
-      this.navDir = 0;
+      st.dir = 0;
       return 0;
     }
-    if (dir !== this.navDir) {
-      this.navDir = dir;
-      this.navT = 0.4;
+    if (dir !== st.dir) {
+      st.dir = dir;
+      st.t = NAV_FIRST_REPEAT_SEC;
       return dir;
     }
-    this.navT -= dt;
-    if (this.navT <= 0) {
-      this.navT = 0.12;
+    st.t -= dt;
+    if (st.t <= 0) {
+      st.t = NAV_REPEAT_SEC;
       return dir;
     }
     return 0;

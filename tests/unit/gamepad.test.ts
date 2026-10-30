@@ -46,6 +46,20 @@ describe('gamepad', () => {
     g.poll();
     expect(g.nav(0.016, 'vertical')).toBe(1);
     expect(g.nav(0.1, 'vertical')).toBe(0);
-    expect(g.nav(0.35, 'vertical')).toBe(1);
+    expect(g.nav(0.45, 'vertical')).toBe(1);
+    expect(g.nav(0.1, 'vertical')).toBe(0);
+    expect(g.nav(0.2, 'vertical')).toBe(1);
+  });
+
+  it('checking both axes each frame does not fire every frame (axes keep separate repeat state)', () => {
+    const b = Array(17).fill(false);
+    b[PAD.RIGHT] = true;
+    const g = new Gamepads(() => [fakePad(b, [0, 0, 0, 0])]);
+    let steps = 0;
+    for (let f = 0; f < 60; f++) {
+      g.poll();
+      if (g.nav(1 / 60, 'vertical') || g.nav(1 / 60, 'horizontal')) steps++;
+    }
+    expect(steps).toBe(3); // at 0 s, 0.5 s and 0.75 s within one second
   });
 });

@@ -41,6 +41,8 @@ const KIOSK_LAMP = { color: '#ffc27a', power: 260, distance: 7, height: 2.5, out
 const FRITZ_COPPER = '#b06a3c';
 /** Arms out of the Renderpeople T-pose (degrees). */
 const T_POSE_ARMS_DOWN_DEG = 86;
+/** The owner's rig rests in an A-pose: a small drop brings the arms to his sides. */
+const OWNER_ARMS_DOWN_DEG = 10;
 
 export interface PlazaDeps {
   physics: PhysicsWorld;
@@ -196,7 +198,7 @@ export async function createPlaza(deps: PlazaDeps, p: PlazaPlacement = PLAZA): P
   };
   const ownerOff = p.kiosk.owner.offset;
   // The owner faces out over the plaza, shouting at passers-by. The death clip is never played.
-  addNpc(ownerModel, kx + out.x * ownerOff, kz + out.z * ownerOff, kioskFacing, 'shout', 0, 0).root.name = 'kiosk_owner';
+  addNpc(ownerModel, kx + out.x * ownerOff, kz + out.z * ownerOff, kioskFacing, 'shout', OWNER_ARMS_DOWN_DEG, 0).root.name = 'kiosk_owner';
   // A citizen glares at Anvin across the plaza (and at the player up close).
   const [c0, c1] = p.citizens;
   if (c0 && c1) {

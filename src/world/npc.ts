@@ -17,6 +17,10 @@ export const GLARE_RADIUS_M = 6;
 export const GLARE_MAX_DEG = 70;
 /** Forearms turned in toward the body after lowering a T-pose. */
 const FOREARM_IN_RAD = 0.45;
+/** Forearm twist that turns a lowered T-pose's palms from facing forward to facing the thighs. */
+const PALM_TWIST_RAD = 1.4;
+/** Arms lowered more than this come from a T-pose (an A-pose rig only needs a small drop). */
+const T_POSE_MIN_RAD = MathUtils.degToRad(45);
 
 export type NpcBehaviour = 'shout' | 'glare';
 
@@ -39,6 +43,7 @@ const _pq = new Quaternion();
 const _d = new Quaternion();
 const _a = new Quaternion();
 const _v = new Vector3();
+const _elbow = new Vector3();
 
 /** Set a bone to its rest rotation turned by `delta` (world space). */
 function turn(j: Joint, delta: Quaternion): void {
@@ -116,20 +121,19 @@ export class Npc {
       turn(j.spine, sway);
     }
 
-    // Arms: lowered out of the T-pose, hanging slightly behind the body; the owner holds a newspaper up at chest height and shakes it on each shout.
+    // Arms hang at the sides, a little behind the torso. The owner shouts with
+    // his body and head, not his arms (a raised open hand read as a strange gesture).
     const down = MathUtils.degToRad(this.opts.armsDownDeg ?? 0);
     const breathe = 0.03 * Math.sin(t * 1.3);
-    const back = 0.12; // upper arms a little behind the torso, as they hang naturally
+    const back = 0.12;
     if (j.armL) turn(j.armL, about(this.fwd, -(down + breathe), _d).multiply(about(this.left, back, _a)));
-    if (j.armR) {
-      const raise = shout ? 0.45 + 0.15 * beat : -back;
-      turn(j.armR, about(this.fwd, down + breathe).multiply(about(this.left, -raise, _a)));
-    }
-    if (j.foreR && shout) turn(j.foreR, about(this.left, -0.9 - 0.2 * beat, _d));
-    // T-pose rigs keep a slight outward bend at the elbow: bring the forearms in against the thighs.
-    if (down > 0) {
-      if (j.foreL) turn(j.foreL, about(this.fwd, FOREARM_IN_RAD, _d));
-      if (j.foreR && !shout) turn(j.foreR, about(this.fwd, -FOREARM_IN_RAD, _d));
+    if (j.armR) turn(j.armR, about(this.fwd, down + breathe, _d).multiply(about(this.left, back, _a)));
+    // A T-pose's palms face down; lowered, they would face forward. Twist each
+    // forearm about its length so the palms turn to the thighs, and bring the
+    // slight outward elbow bend in against the body.
+    if (down > T_POSE_MIN_RAD) {
+      if (j.foreL) this.forearm(j.foreL, FOREARM_IN_RAD, PALM_TWIST_RAD);
+      if (j.foreR) this.forearm(j.foreR, -FOREARM_IN_RAD, -PALM_TWIST_RAD);
     }
 
     // Head: glare at the player within 6 m (yaw clamped to 70 degrees), else look ahead.
@@ -154,6 +158,20 @@ export class Npc {
       // Turning about +Y by +yaw swings +Z (forward) toward +X (left).
       turn(head, about(this.up, this.lookYaw).multiply(about(this.left, -this.lookPitch + nod, _a)));
     }
+  }
+
+  /**
+   * Bend a forearm in about the NPC's forward axis, then twist it about its
+   * own length (elbow to wrist, measured after the bend) to turn the palm.
+   */
+  private forearm(j: Joint, inRad: number, twistRad: number): void {
+    const bend = new Quaternion().setFromAxisAngle(this.fwd, inRad);
+    turn(j, bend);
+    const wrist = j.bone.children.find((c) => (c as Bone).isBone);
+    if (!wrist) return;
+    j.bone.getWorldPosition(_elbow);
+    wrist.getWorldPosition(_v).sub(_elbow).normalize();
+    turn(j, new Quaternion().setFromAxisAngle(_v, twistRad).multiply(bend));
   }
 
   /** Current glare yaw in degrees (positive toward the NPC's left). */
