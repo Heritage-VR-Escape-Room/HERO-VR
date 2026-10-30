@@ -51,13 +51,19 @@ interface Session {
  * backend flags survive.
  */
 function goToMainMenu(params: URLSearchParams): void {
+  location.assign(urlKeeping(params));
+}
+
+/** This page's URL with only the test, language and backend flags, plus `extra`. */
+function urlKeeping(params: URLSearchParams, extra: Record<string, string> = {}): string {
   const keep = new URLSearchParams();
   for (const k of ['test', 'lang', 'forceWebGL']) {
     const v = params.get(k);
     if (v !== null) keep.set(k, v);
   }
+  for (const [k, v] of Object.entries(extra)) keep.set(k, v);
   const q = keep.toString();
-  location.assign(`${location.pathname}${q ? `?${q}` : ''}`);
+  return `${location.pathname}${q ? `?${q}` : ''}`;
 }
 
 const PHYSICS_HZ = 60;
@@ -493,26 +499,23 @@ async function startMenu(session: Session): Promise<void> {
   };
   window.addEventListener('resize', resize);
 
+  // The menu world shares cached models and textures with the game world, so
+  // it is never torn down in place: the game starts on a fresh page instead.
   let leaving = false;
-  const enterGame = async (restore: boolean): Promise<void> => {
+  const enterGame = (restore: boolean): void => {
     if (leaving) return;
     leaving = true;
     menu.hide();
-    await renderer.setAnimationLoop(null);
-    unsubSettings();
-    window.removeEventListener('resize', resize);
-    backdrop.dispose();
-    const data = restore ? save.load() : null;
-    if (data) director.restore(data);
-    await startGame(session, 'garden', { newGame: !data });
+    void renderer.setAnimationLoop(null);
+    location.assign(urlKeeping(session.params, { play: restore ? 'continue' : 'new' }));
   };
   const menu = createMainMenu({
     i18n,
     save,
     settingsScreen: session.settingsScreen,
     credits: createCredits(i18n),
-    onContinue: () => void enterGame(true),
-    onNewGame: () => void enterGame(false),
+    onContinue: () => enterGame(true),
+    onNewGame: () => enterGame(false),
   });
   menu.show();
 
@@ -599,7 +602,14 @@ async function boot(): Promise<void> {
   };
 
   const scene = params.get('scene');
-  if (scene === 'fogtest') await startFogTest(renderer, params, backend);
+  const play = params.get('play');
+  if (play === 'new' || play === 'continue') {
+    // A reload mid-game goes back to the main menu.
+    history.replaceState(null, '', urlKeeping(params));
+    const data = play === 'continue' ? save.load() : null;
+    if (data) director.restore(data);
+    await startGame(session, 'garden', { newGame: !data });
+  } else if (scene === 'fogtest') await startFogTest(renderer, params, backend);
   else if (scene === 'flat' || scene === 'garden') await startGame(session, scene);
   else await startMenu(session);
 

@@ -40,6 +40,9 @@ test('New Game plays Act 0 to the end card', async ({ page }) => {
   await page.click('#menu-new');
   await page.waitForFunction(() => (window.__hero?.playerPos?.() !== undefined) && (window.__hero.frames?.() ?? 0) > 30, undefined, { timeout: 120_000 });
 
+  // The game world draws (a black frame compresses to a few KB).
+  expect((await page.screenshot()).length).toBeGreaterThan(200_000);
+
   // b1: woke on the bench, looking at the pyramid.
   expect(await beats(page)).toEqual(['b1_wake']);
   const start = await page.evaluate(() => window.__hero!.playerPos!());
