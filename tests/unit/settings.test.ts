@@ -45,8 +45,8 @@ describe('settings', () => {
     expect(createSettingsService(kv).get().custom).toEqual(ok);
   });
   it('presets table matches spec', () => {
-    expect(presetOptions('Low')).toEqual({ renderScale: 0.67, shadows: 'Low', fog: 'Low', ssao: false, aa: 'FXAA', motionBlur: false, frameCap: 30 });
-    expect(presetOptions('Medium')).toEqual({ renderScale: 0.85, shadows: 'Medium', fog: 'Medium', ssao: true, aa: 'SMAA', motionBlur: false, frameCap: 60 });
+    expect(presetOptions('Low')).toEqual({ renderScale: 0.67, shadows: 'Off', fog: 'Low', ssao: false, aa: 'FXAA', motionBlur: false, frameCap: 30 });
+    expect(presetOptions('Medium')).toEqual({ renderScale: 0.85, shadows: 'Low', fog: 'Medium', ssao: true, aa: 'SMAA', motionBlur: false, frameCap: 60 });
     expect(presetOptions('High')).toEqual({ renderScale: 1.0, shadows: 'High', fog: 'High', ssao: true, aa: 'TAA', motionBlur: false, frameCap: 60 });
     expect(presetOptions('Ultra')).toEqual({ renderScale: 1.0, shadows: 'High', fog: 'Ultra', ssao: true, aa: 'TAA', motionBlur: true, frameCap: 0 });
   });

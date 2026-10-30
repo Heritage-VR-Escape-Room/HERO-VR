@@ -86,6 +86,7 @@ export interface HeroHooks {
   renderFps?: () => number;
   /** Whether the main menu (or a screen opened from it) is showing. */
   menuOpen?: () => boolean;
+  renderInfo?: () => { calls: number; triangles: number; geometries: number };
   /** Show the end-of-slice card (game scenes). */
   showEndCard?: () => void;
   /** Put the player's feet on the ground at (x, z), facing bearing `yaw`. */

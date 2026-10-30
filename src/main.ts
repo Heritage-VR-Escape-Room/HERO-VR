@@ -381,6 +381,7 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
     gameState: () => state.get(),
     renderFps: () => meter.fps(),
     gpuTextures: () => renderer.info.memory.textures,
+    renderInfo: () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries }),
     showEndCard,
     steps: () => [...steps],
     focusedId: () => interactor.focused()?.id ?? null,
