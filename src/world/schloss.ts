@@ -18,7 +18,7 @@ import {
   SphereGeometry,
   type Material,
 } from 'three/webgpu';
-import { color, float, floor, fract, hash, luminance, mix, normalMap, step, texture, uv, vec3 } from 'three/tsl';
+import { color, float, floor, fract, hash, luminance, mix, normalMap, step, texture, time, uv, vec3 } from 'three/tsl';
 import { SCHLOSS, schlossSegments } from '../logic/worldLayout';
 import { loadModel } from './assets';
 import type { PhysicsWorld } from './colliders';
@@ -92,7 +92,11 @@ async function wallMaterial(): Promise<MeshStandardNodeMaterial> {
   const storey: N = fract(p.y.div(FLOOR_M));
   const win: N = step(0.3, bay).mul(step(bay, 0.7)).mul(step(0.22, storey)).mul(step(storey, 0.8));
   const cellId: N = floor(p.x.div(WINDOW_BAY_M)).add(floor(p.y.div(FLOOR_M)).mul(37.0));
-  const lit: N = step(0.94, hash(cellId));
+  // Someone is still up: each window draws a new on/off lot every ~25 s, its
+  // own phase staggered, so lights come and go across the facade.
+  const period: N = float(25);
+  const epoch: N = floor(time.div(period).add(hash(cellId.mul(1.7))));
+  const lit: N = step(0.93, hash(cellId.add(epoch.mul(13.1))));
   m.colorNode = mix(wall, vec3(0.015, 0.017, 0.02), win);
   m.emissiveNode = color('#FFB066').mul(win.mul(lit).mul(0.9));
   m.normalNode = normalMap(texture(set.nor, tile).rgb);

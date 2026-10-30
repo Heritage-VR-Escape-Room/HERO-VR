@@ -17,7 +17,10 @@ export type SfxName =
   | 'item_pickup'
   | 'ui_hover'
   | 'ui_click'
-  | 'cough';
+  | 'cough'
+  | 'bike_bell'
+  | 'dog_bark'
+  | 'pigeon_flutter';
 
 const noiseCache = new WeakMap<BaseAudioContext, AudioBuffer>();
 
@@ -162,6 +165,34 @@ export function sfx(v: Voice, name: SfxName): void {
     case 'ui_click':
       noise(v, 'bandpass', 2400, 2, 0.25, 0.001, 0.03);
       tone(v, 'sine', 900, 700, 0.12, 0.002, 0.08);
+      break;
+    case 'bike_bell':
+      // Two quick rings of a bicycle bell: a bright bell partial set.
+      for (const at of [t, t + 0.16]) {
+        tone(v, 'sine', 2350, 2340, 0.18, 0.002, 0.6, at);
+        tone(v, 'sine', 3720, 3700, 0.09, 0.002, 0.4, at);
+        noise(v, 'highpass', 5000, 1, 0.05, 0.001, 0.02, at);
+      }
+      break;
+    case 'dog_bark':
+      // Two barks: a falling growl through a mouth formant.
+      for (const at of [t, t + 0.28]) {
+        const o = v.ctx.createOscillator();
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(520, at);
+        o.frequency.exponentialRampToValueAtTime(240, at + 0.14);
+        const f = v.ctx.createBiquadFilter();
+        f.type = 'bandpass';
+        f.frequency.value = 900;
+        f.Q.value = 1.6;
+        o.connect(f).connect(env(v, 0.6, 0.008, 0.15, at));
+        o.start(at);
+        o.stop(at + 0.2);
+        noise(v, 'bandpass', 1200, 1.2, 0.2, 0.005, 0.12, at);
+      }
+      break;
+    case 'pigeon_flutter':
+      for (let i = 0; i < 9; i++) noise(v, 'bandpass', 700 + Math.random() * 600, 0.9, 0.3, 0.004, 0.05, t + i * 0.055);
       break;
     case 'cough':
       // Two dry coughs: a voiced burst through a throat formant.

@@ -66,8 +66,10 @@ def main():
     bpy.ops.import_scene.gltf(filepath=o["in"])
 
     # The glTF importer adds an "Icosphere" mesh as bone display shape; it is not part of the model.
-    for obj in list(bpy.data.objects):
-        if obj.type == "ARMATURE" and obj.pose:
+    # Collect the armatures first: removing a shape object while iterating the
+    # object list leaves a dead reference (rigs with several armatures).
+    armatures = [obj for obj in bpy.data.objects if obj.type == "ARMATURE" and obj.pose]
+    for obj in armatures:
             for pb in obj.pose.bones:
                 if pb.custom_shape:
                     shape = pb.custom_shape

@@ -333,6 +333,96 @@
       "author": "Dimitrios Savva",
       "license": "CC0 1.0",
       "url": "https://polyhaven.com/a/bark_platanus"
+    },
+    {
+      "slot": "human_npc_f2",
+      "kind": "model",
+      "source": "sketchfab",
+      "id": "c659bd0accab47c6bbe390cf822a2b92",
+      "slug": "human_npc_f2",
+      "targetSize": {
+        "axis": "height",
+        "meters": 1.68
+      },
+      "maxTris": 30000,
+      "pickedBy": "controller (owner: make the world alive)",
+      "title": "Claudia Rigged 002 - 3D Rigged Business Women",
+      "author": "Renderpeople",
+      "license": "CC-BY 4.0",
+      "url": "https://sketchfab.com/3d-models/claudia-rigged-002-3d-rigged-business-women-c659bd0accab47c6bbe390cf822a2b92",
+      "faces": 21492
+    },
+    {
+      "slot": "police",
+      "kind": "model",
+      "source": "sketchfab",
+      "id": "c6d330c59f6c41eea41c71e00e39334b",
+      "slug": "police",
+      "targetSize": {
+        "axis": "height",
+        "meters": 1.84
+      },
+      "maxTris": 30000,
+      "pickedBy": "controller (owner: make the world alive)",
+      "title": "Police Man from the U.S.A. (T-pose rig mixamo )",
+      "author": "ustoopia",
+      "license": "CC-BY 4.0",
+      "url": "https://sketchfab.com/3d-models/police-man-from-the-usa-t-pose-rig-mixamo-c6d330c59f6c41eea41c71e00e39334b",
+      "faces": 28448
+    },
+    {
+      "slot": "bicycle",
+      "kind": "model",
+      "source": "sketchfab",
+      "id": "4cc719f387cb4cb4aea6e12a27e06e2e",
+      "slug": "bicycle",
+      "targetSize": {
+        "axis": "length",
+        "meters": 1.75
+      },
+      "maxTris": 12000,
+      "pickedBy": "controller (owner: make the world alive)",
+      "title": "Yellow bicycle",
+      "author": "Tatyana Volkova",
+      "license": "CC-BY 4.0",
+      "url": "https://sketchfab.com/3d-models/yellow-bicycle-4cc719f387cb4cb4aea6e12a27e06e2e",
+      "faces": 16174
+    },
+    {
+      "slot": "dog",
+      "kind": "model",
+      "source": "sketchfab",
+      "id": "62b04b0d87ba40c9ab826e0534061c59",
+      "slug": "dog",
+      "targetSize": {
+        "axis": "length",
+        "meters": 1.05
+      },
+      "maxTris": 18000,
+      "pickedBy": "controller (owner: make the world alive)",
+      "title": "German Shepherd Rig",
+      "author": "Puppies4life",
+      "license": "CC-BY 4.0",
+      "url": "https://sketchfab.com/3d-models/german-shepherd-rig-62b04b0d87ba40c9ab826e0534061c59",
+      "faces": 17913
+    },
+    {
+      "slot": "pigeon",
+      "kind": "model",
+      "source": "sketchfab",
+      "id": "ddd5ef4a94eb4159937a9de25c45697c",
+      "slug": "pigeon",
+      "targetSize": {
+        "axis": "length",
+        "meters": 0.32
+      },
+      "maxTris": 4000,
+      "pickedBy": "controller (owner: make the world alive)",
+      "title": "Pigeon",
+      "author": "kenchoo",
+      "license": "CC-BY 4.0",
+      "url": "https://sketchfab.com/3d-models/pigeon-ddd5ef4a94eb4159937a9de25c45697c",
+      "faces": 6928
     }
   ]
 }

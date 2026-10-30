@@ -290,6 +290,7 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
     audio.play('ui_click');
   };
   const talkTargets: Array<{ role: string; root: import('three/webgpu').Object3D }> = [];
+  let life: import('./world/life').PlazaLife | null = null;
   let anvinRoot: import('three/webgpu').Object3D | null = null;
   const { Vector3: V3 } = await import('three/webgpu');
   const panelAt = new V3();
@@ -350,16 +351,37 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
     trail = createUvTrail((x, z) => garden!.groundHeight(x, z));
     world.scene.add(trail.root);
 
+    // Plaza life: cyclists, the arguing pair, the policeman, coughs, the dog, pigeons, the newspaper.
+    const { createPlazaLife, NEWSPAPER_SPOTS, newspaperId } = await import('./world/life');
+    life = await createPlazaLife({
+      physics,
+      i18n,
+      groundAt: (x, z) => garden!.groundHeight(x, z),
+      center: { x: px, z: pz },
+      low: settings.get().preset === 'Low',
+      onSound: (name, at) => audio.play(name, at),
+    });
+    world.scene.add(life.root);
+    for (let i = 0; i < NEWSPAPER_SPOTS; i++) {
+      const doc = createDocumentInteractable({ id: newspaperId(i), docKey: 'newspaper', object: life.newspaper.object });
+      interactor.register({ ...doc, canInteract: () => life!.newspaper.restingAt() === i, interact: () => (audio.play('paper_rustle'), doc.interact()) });
+    }
+
     // People: E to talk; each talk plays the person's next line, cycling.
     const roles: Record<string, string> = { kiosk_owner: 'owner', anvin: 'anvin', citizen_1: 'citizen' };
     const talkNext: Record<string, number> = {};
-    for (const npc of plaza.npcs) {
-      const role = roles[npc.root.name];
-      if (!role) continue;
-      const p = npc.root.position;
-      physics.addStaticBox({ x: p.x, y: 0.95, z: p.z }, { x: 0.38, y: 0.95, z: 0.38 }, 0, { group: GROUPS.INTERACTABLE, id: `npc_${role}` });
-      talkTargets.push({ role, root: npc.root });
-      if (role === 'anvin') anvinRoot = npc.root;
+    const people: Array<{ role: string; root: import('three/webgpu').Object3D; collider: boolean }> = [
+      ...plaza.npcs.filter((n) => roles[n.root.name]).map((n) => ({ role: roles[n.root.name]!, root: n.root, collider: true })),
+      // The plaza life's people bring their own colliders.
+      ...life.people.map((p) => ({ role: p.role, root: p.root, collider: false })),
+    ];
+    for (const person of people) {
+      const { role, root: npcRoot } = person;
+      const p = npcRoot.position;
+      if (person.collider) physics.addStaticBox({ x: p.x, y: 0.95, z: p.z }, { x: 0.38, y: 0.95, z: 0.38 }, 0, { group: GROUPS.INTERACTABLE, id: `npc_${role}` });
+      talkTargets.push({ role, root: npcRoot });
+      if (role === 'anvin') anvinRoot = npcRoot;
+      const npc = { root: npcRoot };
       interactor.register({
         id: `npc_${role}`,
         promptKey: 'prompt.talk',
@@ -729,6 +751,9 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
 
   const fixed = createFixedStep(PHYSICS_HZ, MAX_SUBSTEPS);
   let journalT = 0;
+  let argueT = 0;
+  let argueLine = 0;
+  const { ARGUMENT } = await import('./dialogue/beats');
   let lastTick: number | null = null;
   let lastRender = 0;
   await renderer.setAnimationLoop((t: number) => {
@@ -761,6 +786,20 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
       if (active !== (activePuzzle === circuitHint)) setActivePuzzle(active ? circuitHint : null);
     }
     trail?.update(dt);
+    if (life) {
+      life.update(dt, world.camera.position);
+      // The argument is overheard, a line every few seconds, while the player is near.
+      argueT -= dt;
+      const near = Math.hypot(controller.position.x - life.argueAt.x, controller.position.z - life.argueAt.z) < 8;
+      if (near && argueT <= 0 && !runner.isPlaying()) {
+        runner.play([ARGUMENT[argueLine % ARGUMENT.length]!]);
+        argueLine++;
+        argueT = 5;
+      }
+      // Once the jammer is dead the city's radios come back.
+      const fired = director.state().firedBeats;
+      if (fired.includes('b_anvin_flees') && !fired.includes('b_radio_back') && !runner.isPlaying()) director.fire('b_radio_back');
+    }
     follower?.update(controller.position, controller.yawDeg);
     if (lockHint) {
       const door = plaza ? plaza.pyramid.doorCenter : lock!.parts.root.position;

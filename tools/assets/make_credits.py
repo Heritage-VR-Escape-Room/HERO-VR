@@ -98,5 +98,12 @@ for r in rows:
     cells = [r["asset"], f"`{r['file']}`", r["source"], r["author"], lic]
     lines.append("| " + " | ".join(c.replace("|", r"\|") for c in cells) + " |")
 lines += ["", "## Notes", ""] + [f"- {n}" for n in NOTES] + [""]
+lines += [
+    "## Audio",
+    "",
+    "All sound (footsteps, Fritz, the circuit panel, the jammer, bells, the dog, pigeons, ambience, theme music) is"
+    " synthesized at runtime with the Web Audio API in `src/audio/`. No third-party audio files are used.",
+    "",
+]
 (ROOT / "ASSET_CREDITS.md").write_text("\n".join(lines), encoding="utf-8")
 print(f"{len(rows)} credit rows")

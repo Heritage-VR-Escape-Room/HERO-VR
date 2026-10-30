@@ -17,6 +17,8 @@ export const BEATS: Record<string, Line[]> = {
   b_anvin_flees: [{ speaker: 'spk.anvin', text: 'dlg.anvin_flees' }],
   b_lenses: [julian('dlg.lenses.julian'), fritz('dlg.lenses.fritz')],
   b_trails: [fritz('dlg.trails.fritz')],
+  // When the jammer dies the city's radios come back.
+  b_radio_back: [{ speaker: 'spk.police', text: 'dlg.radio_back.police' }, { speaker: 'spk.local_f', text: 'dlg.radio_back.local' }],
   b2_newsstand: [{ speaker: 'spk.owner', text: 'dlg.b2.owner' }],
   b4_fritz_arrives: [fritz('dlg.b4.fritz')],
   b5_latin_translation: [fritz('dlg.b5.fritz')],
@@ -32,7 +34,19 @@ export const TALK: Record<string, Line[][]> = {
   owner: [1, 2, 3].map((n) => [{ speaker: 'spk.owner', text: `talk.owner.${n}` }]),
   anvin: [1, 2, 3].map((n) => [{ speaker: 'spk.anvin', text: `talk.anvin.${n}` }]),
   citizen: [1, 2, 3].map((n) => [{ speaker: 'spk.citizen', text: `talk.citizen.${n}` }]),
+  police: [1, 2, 3].map((n) => [{ speaker: 'spk.police', text: `talk.police.${n}` }]),
+  local_m: [1, 2].map((n) => [{ speaker: 'spk.local_m', text: `talk.local_m.${n}` }]),
+  local_f: [1, 2].map((n) => [{ speaker: 'spk.local_f', text: `talk.local_f.${n}` }]),
 };
+
+/** The two locals' argument, overheard in turns when the player is near. */
+export const ARGUMENT: Line[] = [
+  { speaker: 'spk.local_m', text: 'argue.1' },
+  { speaker: 'spk.local_f', text: 'argue.2' },
+  { speaker: 'spk.local_f', text: 'argue.3' },
+  { speaker: 'spk.local_m', text: 'argue.4' },
+];
+
 
 /** Fritz's tiered hints for the cipher-disc lock (spec §7 hint table), tier 1..4. */
 export const LOCK_HINTS: Line[] = [1, 2, 3, 4].map((n) => fritz(`hint.lock.${n}`));
@@ -48,6 +62,10 @@ export const USED_KEYS: readonly string[] = [
   ...new Set([
     ...Object.values(BEATS).flatMap((ls) => ls.flatMap((l) => [l.speaker, l.text])),
     ...LOCK_HINTS.flatMap((l) => [l.speaker, l.text]),
+    ...ARGUMENT.flatMap((l) => [l.speaker, l.text]),
+    'doc.newspaper.headline',
+    'doc.newspaper.title',
+    'doc.newspaper.body',
     ...Object.values(TALK).flatMap((sets) => sets.flatMap((ls) => ls.flatMap((l) => [l.speaker, l.text]))),
     'hint.circuit.1',
     'hint.circuit.2',
