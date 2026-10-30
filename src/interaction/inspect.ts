@@ -89,6 +89,13 @@ export class InspectView {
     return this.active;
   }
 
+  /** Gamepad: turn the object (pixels-equivalent deltas). */
+  rotate(dx: number, dy: number): void {
+    if (!this.active) return;
+    this.pivot.rotateOnWorldAxis(Y_AXIS, dx * INSPECT.rotateSpeed);
+    this.pivot.rotateOnWorldAxis(X_AXIS, dy * INSPECT.rotateSpeed);
+  }
+
   open(source: Object3D, opts: { textKey?: string } = {}): void {
     if (this.active) return;
     this.active = true;

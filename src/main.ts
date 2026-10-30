@@ -210,8 +210,14 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
     world.fog.syncLights(); // the plaza's lamps join the fog (nearest ones, capped)
   }
   const keyboard = new KeyboardInput(window, () => settings.get().bindings);
+  // Gamepad: polled every tick; left stick moves, clicks sprint (L) and crouch (R).
+  const { Gamepads, PAD, focusStep, clickFocused, tapKey, tapLog: padTapLog } = await import('./player/gamepad');
+  const pad = new Gamepads();
   const controller = new PlayerController(physics, world.camera, {
-    input: () => keyboard.move(),
+    input: () => {
+      const k = keyboard.move();
+      return { ...k, stick: pad.move(), sprint: k.sprint || pad.isDown(PAD.LS), crouch: k.crouch || pad.isDown(PAD.RS) };
+    },
     look: () => settings.get(),
   });
   if (plaza) {
@@ -225,7 +231,8 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
   const toMenu = (): void => goToMainMenu(params);
   const pause = createPauseMenu({
     i18n,
-    onResume: () => pointerLock.request(),
+    // A pad press is no user gesture for the pointer lock: play on without it.
+    onResume: () => (pad.active() ? pointerLock.enterWithoutLock() : pointerLock.request()),
     onSettings: () => session.settingsScreen.open(),
     onMainMenu: toMenu,
   });
@@ -243,7 +250,7 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
     bindings: () => settings.get().bindings,
     enabled: () => state.get() === 'playing' && !modal.isActive(),
   });
-  const hud = createHud(i18n, () => codeLabel(settings.get().bindings.interact));
+  const hud = createHud(i18n, () => (pad.active() ? 'A' : codeLabel(settings.get().bindings.interact)));
   interactor.onFocusChange((i) => hud.showPrompt(i?.promptKey ?? null));
   const endCard = createEndCard(i18n, toMenu);
   let act0: import('./dialogue/act0').Act0 | null = null;
@@ -407,7 +414,8 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
       import('./companion/follow'),
       import('./world/uvTrail'),
     ]);
-    follower = createFollower(fritz, (x, z) => garden!.groundHeight(x, z));
+    // He flies over the pyramid (6.8 m) rather than into it.
+    follower = createFollower(fritz, (x, z) => garden!.groundHeight(x, z), [{ x: px, z: pz, half: 4.2, top: 6.8 }]);
     const [kx, , kz] = PLAZA.kiosk.position;
     const [ax, , az] = PLAZA.citizens[0]!.position;
     act0 = createAct0({
@@ -584,6 +592,7 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
       plug: (t: string) => circuit!.plugInto(t as import('./logic/circuit').Terminal),
     },
     lenses: () => lensesOn,
+    padTaps: () => [...padTapLog],
     npcs: () => talkTargets.map((t) => ({ role: t.role, x: t.root.position.x, z: t.root.position.z, visible: t.root.visible })),
     journal: () => journalFor(director.state()),
     journalOpen: () => journal.isOpen(),
@@ -641,6 +650,83 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
   // First launch: measure this machine in the game itself and pick a preset.
   const autoPick = (await import('./ui/menu')).createAutoPick(settings);
 
+  // Gamepad buttons drive the same paths as the keyboard and mouse.
+  const LOOK_PX_PER_SEC = 900; // mouse-pixel equivalent at full stick
+  let padOutline = false;
+  let padAnnounced = false;
+  const handlePad = (dt: number): void => {
+    pad.poll();
+    if (!pad.connected()) return;
+    if (!padAnnounced) {
+      padAnnounced = true;
+      const toast = document.getElementById('journal-toast');
+      if (toast) {
+        toast.textContent = i18n.t('ui.pad.connected');
+        toast.hidden = false;
+        window.setTimeout(() => (toast.hidden = true), 6000);
+      }
+    }
+    const bindings = settings.get().bindings;
+    if (intro) {
+      if (pad.pressed(PAD.A) || pad.pressed(PAD.B) || pad.pressed(PAD.START)) tapKey('Space');
+      return;
+    }
+    const circuitFocused = circuit?.state().focused ?? false;
+    if (padOutline && !circuitFocused) {
+      world.highlight.setHighlighted([]);
+      padOutline = false;
+    }
+    // Menus over the game: pause, settings, the end card.
+    if (pause.isOpen() || session.settingsScreen.isOpen() || endCard.isOpen()) {
+      const d = pad.nav(dt, 'vertical') || pad.nav(dt, 'horizontal');
+      if (d) focusStep(d);
+      if (pad.pressed(PAD.A)) clickFocused();
+      if (pad.pressed(PAD.B)) tapKey('Escape');
+      if (pad.pressed(PAD.START) && pause.isOpen() && !session.settingsScreen.isOpen()) pointerLock.enterWithoutLock();
+      return;
+    }
+    const st = state.get();
+    if (st !== 'playing') {
+      if (pad.pressed(PAD.A) || pad.pressed(PAD.START)) pointerLock.enterWithoutLock();
+      return;
+    }
+    if (circuit && circuitFocused) {
+      const d = pad.nav(dt, 'horizontal') || pad.nav(dt, 'vertical');
+      if (d) circuit.padStep(d);
+      if (pad.pressed(PAD.A)) circuit.padActivate();
+      if (pad.pressed(PAD.X)) requestHint();
+      if (pad.pressed(PAD.B)) tapKey('Escape');
+      if (pad.active() && !circuit.state().solved) {
+        world.highlight.setHighlighted([circuit.padSelected()]);
+        padOutline = true;
+      }
+      return;
+    }
+    if (inspect.isOpen()) {
+      const l = pad.look();
+      inspect.rotate(l.x * 500 * dt, l.y * 500 * dt);
+      if (pad.pressed(PAD.A) || pad.pressed(PAD.B)) tapKey('Escape');
+      return;
+    }
+    if (journal.isOpen()) {
+      if (pad.pressed(PAD.Y) || pad.pressed(PAD.B) || pad.pressed(PAD.BACK)) journal.close();
+      return;
+    }
+    if (modal.isActive()) {
+      // The document view.
+      if (pad.pressed(PAD.A) || pad.pressed(PAD.B)) tapKey('Escape');
+      return;
+    }
+    // Free roam: look on a soft curve so small pushes aim finely.
+    const l = pad.look();
+    if (l.x || l.y) controller.look(l.x * Math.abs(l.x) * LOOK_PX_PER_SEC * dt, l.y * Math.abs(l.y) * LOOK_PX_PER_SEC * dt);
+    if (pad.pressed(PAD.A)) tapKey(bindings.interact);
+    if (pad.pressed(PAD.X)) tapKey(bindings.hint);
+    if (pad.pressed(PAD.Y) || pad.pressed(PAD.BACK)) tapKey('KeyJ');
+    if (pad.pressed(PAD.LB)) tapKey('KeyL');
+    if (pad.pressed(PAD.START)) pointerLock.pauseNow();
+  };
+
   const fixed = createFixedStep(PHYSICS_HZ, MAX_SUBSTEPS);
   let journalT = 0;
   let lastTick: number | null = null;
@@ -648,6 +734,7 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
   await renderer.setAnimationLoop((t: number) => {
     const dt = lastTick === null ? 0 : (t - lastTick) / 1000;
     lastTick = t;
+    handlePad(dt);
     const alpha = fixed.advance(dt, (h) => {
       controller.fixedUpdate(h);
       physics.step(h);
@@ -777,8 +864,21 @@ async function startMenu(session: Session): Promise<void> {
     gpuTextures: () => renderer.info.memory.textures,
     menuOpen: () => menu.isOpen(),
   });
+  const { Gamepads, PAD, focusStep, clickFocused, tapKey } = await import('./player/gamepad');
+  const pad = new Gamepads();
+  let last = performance.now();
   const tick = (): void => {
     frames++;
+    const now = performance.now();
+    const dt = (now - last) / 1000;
+    last = now;
+    pad.poll();
+    if (pad.connected()) {
+      const d = pad.nav(dt, 'vertical') || pad.nav(dt, 'horizontal');
+      if (d) focusStep(d);
+      if (pad.pressed(PAD.A)) clickFocused();
+      if (pad.pressed(PAD.B)) tapKey('Escape');
+    }
     requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);

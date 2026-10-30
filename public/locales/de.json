@@ -96,8 +96,8 @@
   "ui.credits.error": "Die Liste der Mitwirkenden konnte nicht geladen werden. Prüfe deine Verbindung und öffne sie erneut.",
   "ui.end.title": "Ende des Prologs",
   "ui.end.thanks": "Danke fürs Spielen",
-  "doc.vanguard_manifesto.title": "VANGUARD ARMAMENTS: Leitweisung 7/19 (Vertraulich)",
-  "doc.vanguard_manifesto.body": "Nur für Abteilungsleiter. Nach dem Lesen vernichten.\n\nDie Lieferungen 14 bis 22 (Boden-Boden-Raketen, in Kisten verpackt und als „Landmaschinen“ deklariert) verlassen das Depot nachts über die Portalbahn. Die Strecke verläuft unter der Schlossgartenbahn; die Öffentlichkeit sieht nur die Miniaturbahn.\n\nVom Portalbahnhof gehen die Kisten weiter nach Port Said, wo die Zollpapiere bereits geregelt sind. Sollte etwas gefunden werden, haben die Zeitungen ihre Geschichte schon fertig: fremde Hände, fremde Tanker, fremde Schuld.\n\nDie Störsender in den Sockeln der Denkmäler bleiben eingeschaltet, bis die letzte Lieferung durch ist. Die Ausbringung von Compound-7 bleibt bei voller Stärke. Eine Stadt, die sich nicht an gestern erinnert, fragt nicht nach heute Nacht.\n\nVanguard Armaments, Direktion Logistik",
+  "doc.vanguard_manifesto.title": "VANGUARD ARMAMENTS: Felddirektive 7/19 (Streng geheim)",
+  "doc.vanguard_manifesto.body": "An: Agent A. (Karlsruhe / Port Said)\nVon: Direktor Vance\n\nDer Wärmedampf hält. Die Satellitenoptik über beiden Städten sieht nur Weiß, und unsere Testraketen fliegen ungesehen über die Dächer. Das bleibt so.\n\nDeine Tarnungen stehen: städtischer Reparaturtrupp am Marktplatz, Parkführer im Schlossgarten, Hafenwache in Port Said. Sicherungen ziehen, Drähte kreuzen, falsche Codes verteilen. Jede kaputte Maschine ist eine weitere Verzögerung, und jede Verzögerung wird der anderen Stadt angelastet.\n\nEs gibt keinen Krieg, und es gab nie einen. Karlsruhe beschuldigt Port Said, Port Said beschuldigt Karlsruhe. Während sie auf den Straßen streiten, fahren unsere Prototypen über die Portalbahnlinie und durch die Kanaltore.\n\nDer Störsender im Sockel der Pyramide bleibt an, bis das Depot im Schlossgarten versiegelt ist. Die Bezahlung folgt nach jedem erledigten Auftrag, wie gehabt.\n\nNach dem Lesen vernichten.\nDirektor Vance, Vanguard Armaments",
   "spk.anvin": "Anvin",
   "prompt.talk": "Sprechen",
   "ui.circuit.hint": "Schalter anklicken zum Umlegen · Blaue Brücke auf eine Klemme ziehen · Esc: zurück",
@@ -139,7 +139,7 @@
   "note.founded": "1715 gegründet von Karl Wilhelm (Markgraf von Baden-Durlach). Die Pyramide ist sein Grabmal.",
   "note.anvin": "Anvin, \"städtischer Reparaturtrupp\", gibt zu, die mittlere Sicherung gezogen und die roten Drähte gekreuzt zu haben. Absichtlich?",
   "note.lid": "In den Deckel der Schalttafel sind Kupferbahnen graviert.",
-  "note.manifesto": "Vanguard Armaments: Raketentransporte über die Portallinie nach Port Said; Störsender in Denkmalsockeln versteckt.",
+  "note.manifesto": "Eine Direktive von Direktor Vance (Vanguard Armaments) an \"Agent A.\": Der Nebel verbirgt Raketentests vor Satelliten, und der Streit zwischen Karlsruhe und Port Said ist inszeniert. In einem Depot im Schlossgarten wartet etwas.",
   "note.lenses": "Spektrallinsen: UV-Glas, das verborgene Energieflüsse zeigt.",
   "note.trails": "Leuchtende UV-Spuren führen von der Pyramide nach Norden zum Schlossgarten.",
   "ui.lenses.on": "Spektrallinsen an",
@@ -149,5 +149,6 @@
   "ui.intro.3": "Julian kam, um herauszufinden, warum. Dann fand ihn der Nebel.",
   "ui.intro.skip": "Leertaste: überspringen",
   "ui.map.north": "N",
-  "item.spectrum_lenses": "Spektrallinsen"
+  "item.spectrum_lenses": "Spektrallinsen",
+  "ui.pad.connected": "Controller verbunden · A: interagieren · X: Hinweis · Y: Tagebuch · LB: Linsen · Start: Pause"
 }

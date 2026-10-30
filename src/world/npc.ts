@@ -15,6 +15,8 @@ import type { GLTF } from './assets';
 
 export const GLARE_RADIUS_M = 6;
 export const GLARE_MAX_DEG = 70;
+/** Forearms turned in toward the body after lowering a T-pose. */
+const FOREARM_IN_RAD = 0.45;
 
 export type NpcBehaviour = 'shout' | 'glare';
 
@@ -124,6 +126,11 @@ export class Npc {
       turn(j.armR, about(this.fwd, down + breathe).multiply(about(this.left, -raise, _a)));
     }
     if (j.foreR && shout) turn(j.foreR, about(this.left, -0.9 - 0.2 * beat, _d));
+    // T-pose rigs keep a slight outward bend at the elbow: bring the forearms in against the thighs.
+    if (down > 0) {
+      if (j.foreL) turn(j.foreL, about(this.fwd, FOREARM_IN_RAD, _d));
+      if (j.foreR && !shout) turn(j.foreR, about(this.fwd, -FOREARM_IN_RAD, _d));
+    }
 
     // Head: glare at the player within 6 m (yaw clamped to 70 degrees), else look ahead.
     const head = j.head;

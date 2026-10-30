@@ -21,7 +21,7 @@ import { INTRO_KEYS } from '../../src/ui/intro';
 const tables: Record<string, Record<string, string>> = { en, ar, de };
 
 const beatKeys = Object.values(BEATS).flatMap((lines) => lines.flatMap((l) => [l.speaker, l.text]));
-const used = [...new Set([...beatKeys, ...DIALOGUE_KEYS, ...ITEM_KEYS, ...PROMPT_KEYS, ...DOC_KEYS, ...INSPECT_KEYS, ...LOCK_KEYS, ...MENU_KEYS, ...PAUSE_KEYS, ...SETTINGS_KEYS, ...CREDITS_KEYS, ...END_KEYS, ...PLAZA_KEYS, ...JOURNAL_KEYS, ...MAP_KEYS, ...INTRO_KEYS, 'ui.intro.skip', 'ui.circuit.hint', 'ui.lenses.on', 'ui.lenses.off', 'prompt.talk', 'item.spectrum_lenses'])];
+const used = [...new Set([...beatKeys, ...DIALOGUE_KEYS, ...ITEM_KEYS, ...PROMPT_KEYS, ...DOC_KEYS, ...INSPECT_KEYS, ...LOCK_KEYS, ...MENU_KEYS, ...PAUSE_KEYS, ...SETTINGS_KEYS, ...CREDITS_KEYS, ...END_KEYS, ...PLAZA_KEYS, ...JOURNAL_KEYS, ...MAP_KEYS, ...INTRO_KEYS, 'ui.intro.skip', 'ui.circuit.hint', 'ui.lenses.on', 'ui.lenses.off', 'prompt.talk', 'item.spectrum_lenses', 'ui.pad.connected'])];
 
 describe('locales', () => {
   it('every key used in BEATS, hints, docs, items and ui exists in en, ar and de with non-empty values', () => {
@@ -50,12 +50,13 @@ describe('locales', () => {
     expect(en['hint.circuit.3']).toBe('Flip Switches 1 and 4, then drag the blue jumper wire to the top-right terminal to complete the circuit!');
   });
 
-  it('the Vanguard manifesto names the missiles, the portal train line and Port Said in every language', () => {
+  it('the Vanguard directive (new script) names Vance, the missiles, the portal train line and Port Said', () => {
     expect(en['doc.vanguard_manifesto.body']).toMatch(/missile/i);
     expect(en['doc.vanguard_manifesto.body']).toMatch(/portal train line/);
     expect(en['doc.vanguard_manifesto.body']).toMatch(/Port Said/);
     expect(en['doc.vanguard_manifesto.body']).toMatch(/Vanguard Armaments/);
-    expect(de['doc.vanguard_manifesto.body']).toMatch(/Raketen/);
+    expect(de['doc.vanguard_manifesto.body']).toMatch(/Testraketen/);
+    expect(en['doc.vanguard_manifesto.body']).toMatch(/Director Vance/);
     expect(de['doc.vanguard_manifesto.body']).toMatch(/Port Said/);
     expect(ar['doc.vanguard_manifesto.body']).toMatch(/صواريخ/);
     expect(ar['doc.vanguard_manifesto.body']).toMatch(/بورسعيد/);

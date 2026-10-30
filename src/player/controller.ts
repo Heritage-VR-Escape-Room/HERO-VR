@@ -39,6 +39,8 @@ export interface MoveInput {
   right: boolean;
   sprint: boolean;
   crouch: boolean;
+  /** Analog stick (gamepad): x right, y forward, magnitude 0..1; adds to the keys. */
+  stick?: { x: number; y: number };
 }
 
 export interface LookSettings {
@@ -151,8 +153,8 @@ export class PlayerController {
     let fwd = 0;
     let strafe = 0;
     if (inp) {
-      fwd = (inp.forward ? 1 : 0) - (inp.back ? 1 : 0);
-      strafe = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
+      fwd = (inp.forward ? 1 : 0) - (inp.back ? 1 : 0) + (inp.stick?.y ?? 0);
+      strafe = (inp.right ? 1 : 0) - (inp.left ? 1 : 0) + (inp.stick?.x ?? 0);
     }
     this.crouching = inp?.crouch ?? this.crouching;
     const len = Math.hypot(fwd, strafe);
@@ -164,7 +166,8 @@ export class PlayerController {
     const b = MathUtils.degToRad(this.yaw);
     const sb = Math.sin(b);
     const cb = Math.cos(b);
-    const scale = len > 0 ? (speed * dt) / len : 0;
+    // A half-pushed stick walks slower; keys (and diagonals) are full speed.
+    const scale = len > 0 ? (speed * dt * Math.min(1, len)) / len : 0;
     const dx = (-sb * fwd - cb * strafe) * scale;
     const dz = (cb * fwd - sb * strafe) * scale;
 

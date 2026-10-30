@@ -180,6 +180,11 @@ export class Fritz {
   private perchId: string | null = null;
   private highlightUntil = -1;
   private highlighted: Object3D[] = [];
+  /** Free flight after a moving point (follow mode); null = not hovering. */
+  private hoverTarget: Vector3 | null = null;
+  private readonly hoverLook = new Vector3();
+  private readonly hoverVel = new Vector3();
+  private hoverYaw = 0;
 
   constructor(private readonly deps: FritzDeps) {
     this.onSound = deps.onSound;
@@ -329,6 +334,30 @@ export class Fritz {
     this.caw();
   }
 
+  /**
+   * Fly freely after `target`, never landing, facing `look` when slow (the
+   * owner wants Fritz always in the air once he has introduced himself).
+   * null ends it; he then hangs where he is until the next flight or perch.
+   */
+  hover(target: Vector3 | null, look?: Vector3): void {
+    if (!target) {
+      this.hoverTarget = null;
+      return;
+    }
+    if (!this.hoverTarget) {
+      this.hoverTarget = new Vector3();
+      this.hoverVel.set(0, 0, 0);
+      this.hoverYaw = this.root.rotation.y;
+      this.perchId = null;
+    }
+    this.hoverTarget.copy(target);
+    if (look) this.hoverLook.copy(look);
+  }
+
+  isHovering(): boolean {
+    return this.hoverTarget !== null;
+  }
+
   caw(): void {
     this.onSound?.('raven_caw');
     if (this.st === 'fly') return;
@@ -345,7 +374,10 @@ export class Fritz {
       this.deps.highlight.setHighlighted([]);
     }
     if (this.flight) this.advanceFlight(dt);
-    else if (this.st === 'caw') {
+    else if (this.hoverTarget) {
+      this.setState('fly');
+      this.advanceHover(dt);
+    } else if (this.st === 'caw') {
       this.cawT += dt;
       if (this.cawT >= CAW_SEC) {
         this.cawT = -1;
@@ -366,6 +398,31 @@ export class Fritz {
   private playAction(s: FritzState): void {
     for (const [name, a] of this.actions) if (name !== s) a.fadeOut(0.15);
     this.actions.get(s)?.reset().fadeIn(0.15).play();
+  }
+
+  /** Spring toward the hover point; bank into turns; face the player when slow. */
+  private advanceHover(dt: number): void {
+    const p = this.root.position;
+    const t = this.hoverTarget!;
+    const k = 6;
+    const c = 2 * Math.sqrt(k);
+    const v = this.hoverVel;
+    v.x += ((t.x - p.x) * k - v.x * c) * dt;
+    v.y += ((t.y + Math.sin(this.clock * 1.7) * 0.12 - p.y) * k - v.y * c) * dt;
+    v.z += ((t.z - p.z) * k - v.z * c) * dt;
+    const speed = v.length();
+    if (speed > FRITZ_SPEED * 1.6) v.multiplyScalar((FRITZ_SPEED * 1.6) / speed);
+    p.addScaledVector(v, dt);
+    const flat = Math.hypot(v.x, v.z);
+    const want = flat > 0.8 ? Math.atan2(v.x, v.z) : Math.atan2(this.hoverLook.x - p.x, this.hoverLook.z - p.z);
+    const dYaw = MathUtils.euclideanModulo(want - this.hoverYaw + Math.PI, Math.PI * 2) - Math.PI;
+    const turn = MathUtils.clamp(dYaw, -4 * dt, 4 * dt);
+    this.hoverYaw += turn;
+    this.root.rotation.y = this.hoverYaw;
+    const maxBank = MathUtils.degToRad(FRITZ_MAX_BANK_DEG);
+    this.bank = MathUtils.clamp(MathUtils.lerp(this.bank, dt > 0 ? (-turn / dt) * 0.15 : 0, 0.1), -maxBank, maxBank);
+    this.root.rotation.z = this.bank;
+    this.root.rotation.x = -MathUtils.clamp(v.y * 0.08, -0.3, 0.3);
   }
 
   private advanceFlight(dt: number): void {

@@ -39,6 +39,25 @@ export class PointerLock {
     document.addEventListener('mousemove', this.onMove);
   }
 
+  /** Gamepad: start playing without the pointer lock (the mouse can still lock later). */
+  enterWithoutLock(): void {
+    const { state, pause, controller } = this.deps;
+    pause.close();
+    state.set('playing');
+    controller.setInputEnabled(true);
+  }
+
+  /** Gamepad Start: open the pause menu as losing the lock would. */
+  pauseNow(): void {
+    const { state, pause, controller, clearInput } = this.deps;
+    if (state.get() !== 'playing') return;
+    if (this.isLocked()) document.exitPointerLock();
+    pause.open();
+    controller.setInputEnabled(false);
+    clearInput();
+    state.set('paused');
+  }
+
   setSuppressPause(on: boolean): void {
     this.suppressPause = on;
   }

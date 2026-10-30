@@ -337,6 +337,38 @@ export class CircuitBoard {
     if (this.blend === 0) this.deps.modal.exit();
   }
 
+  /** Gamepad selection order: switches 1-4, then the terminals clockwise from top-left. */
+  private padIndex = 0;
+  private readonly padOrder: Array<{ kind: 'switch'; i: number } | { kind: 'terminal'; t: Terminal }> = [
+    { kind: 'switch', i: 0 },
+    { kind: 'switch', i: 1 },
+    { kind: 'switch', i: 2 },
+    { kind: 'switch', i: 3 },
+    { kind: 'terminal', t: 'TL' },
+    { kind: 'terminal', t: 'TR' },
+    { kind: 'terminal', t: 'BR' },
+    { kind: 'terminal', t: 'BL' },
+  ];
+
+  padStep(delta: number): void {
+    const n = this.padOrder.length;
+    this.padIndex = (this.padIndex + delta + n) % n;
+    this.deps.onSound?.('ring_tick');
+  }
+
+  /** The object the pad selection points at (outlined while the pad is in use). */
+  padSelected(): Object3D {
+    const s = this.padOrder[this.padIndex]!;
+    return s.kind === 'switch' ? this.root.getObjectByName(`switch_${s.i + 1}`)! : this.root.getObjectByName(`terminal_${s.t}`)!;
+  }
+
+  padActivate(): void {
+    if (!this.ready()) return;
+    const s = this.padOrder[this.padIndex]!;
+    if (s.kind === 'switch') this.flip(s.i);
+    else this.plugInto(s.t);
+  }
+
   /** Flip switch i (0-3). */
   flip(i: number): void {
     if (this.solved) return;

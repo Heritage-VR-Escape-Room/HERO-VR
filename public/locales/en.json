@@ -96,8 +96,8 @@
   "ui.credits.error": "The credits list could not be loaded. Check your connection and open Credits again.",
   "ui.end.title": "End of Prologue",
   "ui.end.thanks": "Thank you for playing",
-  "doc.vanguard_manifesto.title": "VANGUARD ARMAMENTS: Routing Order 7/19 (Confidential)",
-  "doc.vanguard_manifesto.body": "For section heads only. Destroy after reading.\n\nShipments 14 to 22 (surface-to-surface missiles, crated and declared as \"agricultural machinery\") leave the depot at night on the portal train line. The line runs beneath the garden railway; the public sees nothing but the miniature train.\n\nFrom the portal terminus the crates travel on to Port Said, where the customs papers have already been arranged. Should anything be found, the newspapers have their story ready: foreign hands, foreign tankers, foreign blame.\n\nThe signal jammers in the monument bases stay on until the last shipment has cleared. Keep the Compound-7 dispersal at full strength. A city that cannot remember yesterday will not ask about tonight.\n\nVanguard Armaments, Logistics Directorate",
+  "doc.vanguard_manifesto.title": "VANGUARD ARMAMENTS: Field Directive 7/19 (Eyes Only)",
+  "doc.vanguard_manifesto.body": "To: Operative A. (Karlsruhe / Port Said)\nFrom: Director Vance\n\nThe thermal vapour is holding. Satellite optics over both cities read nothing but white, and our test missiles fly unseen above the rooftops. Keep it that way.\n\nYour covers stand: city repair crew at the Marktplatz, park guide in the Schlossgarten, harbour guard in Port Said. Pull fuses, cross wires, hand out wrong codes. Every broken machine is another delay, and every delay is blamed on the other city.\n\nThere is no war, and there never was. Karlsruhe blames Port Said; Port Said blames Karlsruhe. While they argue in the streets, our prototypes cross on the portal train line and through the canal gates.\n\nThe jammer in the pyramid base stays on until the depot in the Schlossgarten is sealed. Payment follows each completed job, as before.\n\nDestroy after reading.\nDirector Vance, Vanguard Armaments",
   "spk.anvin": "Anvin",
   "prompt.talk": "Talk",
   "ui.circuit.hint": "Click a switch to flip it · Drag the blue jumper to a terminal · Esc: step back",
@@ -139,7 +139,7 @@
   "note.founded": "Founded in 1715 by Charles William (Margrave Karl Wilhelm of Baden-Durlach). The pyramid is his tomb.",
   "note.anvin": "Anvin, \"city repair crew\", admits he pulled the middle fuse and crossed the red wires on the pyramid's board. On purpose?",
   "note.lid": "The panel lid has copper trace paths engraved on it.",
-  "note.manifesto": "Vanguard Armaments: missile shipments on the portal line to Port Said; jammers hidden in monument bases.",
+  "note.manifesto": "A directive from Director Vance of Vanguard Armaments to \"Operative A.\": the fog hides missile tests from satellites, and the feud between Karlsruhe and Port Said is staged. Something waits in a depot in the Schlossgarten.",
   "note.lenses": "Spectrum Lenses: UV glass that shows hidden energy flows.",
   "note.trails": "Glowing UV trails run north from the pyramid toward the Schlossgarten.",
   "ui.lenses.on": "Spectrum Lenses on",
@@ -149,5 +149,6 @@
   "ui.intro.3": "Julian came to find out why. Then the mist found him.",
   "ui.intro.skip": "Space: skip",
   "ui.map.north": "N",
-  "item.spectrum_lenses": "Spectrum Lenses"
+  "item.spectrum_lenses": "Spectrum Lenses",
+  "ui.pad.connected": "Controller connected · A: interact · X: hint · Y: journal · LB: lenses · Start: pause"
 }
