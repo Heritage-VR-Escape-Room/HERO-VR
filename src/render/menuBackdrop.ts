@@ -1,8 +1,7 @@
 /**
- * Main-menu background: a world seen from a camera slowly orbiting a
- * viewpoint. The world comes from a factory: the game passes the plaza and
- * its `menu_orbit` viewpoint (world/plazaBackdrop.ts); the fogtest scene is
- * the default for anything else.
+ * Orbiting-camera backdrop: a world seen from a camera slowly circling a
+ * viewpoint. The main menu now shows a still image instead (main.ts
+ * startMenu); this stays for the orbit math and the plaza's `menu_orbit`.
  */
 import { Mesh, type PerspectiveCamera, type Scene, type Texture, type WebGPURenderer } from 'three/webgpu';
 import type { GraphicsOptions } from '../logic/presets';
