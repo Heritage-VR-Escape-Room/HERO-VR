@@ -19,7 +19,8 @@ test('all perches and viewpoints exist', async ({ page }) => {
   test.setTimeout(120_000);
   const errors = await open(page);
   const perches = await page.evaluate(() => window.__hero!.fritz!.perches!());
-  expect([...perches].sort()).toEqual(['bench_back', 'kiosk_roof', 'lamp_3', 'pyramid_tip']);
+  // Plus the dynamic 'intro' / 'follow' spots once Fritz has met the player.
+  expect(perches).toEqual(expect.arrayContaining(['bench_back', 'kiosk_roof', 'lamp_3', 'pyramid_tip']));
   for (const id of ['pyramid_tip', 'lamp_3']) {
     await page.evaluate((p) => window.__hero!.fritz!.flyTo(p), id);
     expect(await page.evaluate(() => window.__hero!.fritz!.perch())).toBe(id);
@@ -40,9 +41,9 @@ test('all perches and viewpoints exist', async ({ page }) => {
   expect(fogLights).toBeGreaterThanOrEqual(8);
   expect(fogLights).toBeLessThanOrEqual(12);
 
-  // The lock is the active puzzle within 6 m of the pyramid door, not from the far side of the plaza.
-  await page.evaluate(() => window.__hero!.teleport!(0, -177, 0));
-  await page.waitForFunction(() => window.__hero!.activePuzzle!() === 'cipher_lock');
+  // The circuit panel is the active puzzle within 6 m of it, not from the far side of the plaza.
+  await page.evaluate(() => window.__hero!.teleport!(-1.45, -177, 0));
+  await page.waitForFunction(() => window.__hero!.activePuzzle!() === 'circuit_bridge');
   await page.evaluate(() => window.__hero!.teleport!(0, -150, 0));
   await page.waitForFunction(() => window.__hero!.activePuzzle!() === null);
   expect(errors).toEqual([]);

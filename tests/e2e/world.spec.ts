@@ -53,6 +53,8 @@ test('ground view from the plaza looking north', async ({ page }) => {
 test('blocker', async ({ page }) => {
   test.setTimeout(120_000);
   const errors = await open(page);
+  // Fritz introduces himself first (no save); a bark never cuts into a story line.
+  await page.waitForFunction(() => window.__hero!.storyState!().firedBeats.includes('b_fritz_intro') && !window.__hero!.dialoguePlaying!(), undefined, { timeout: 60_000 });
   // 69 m due south of the plaza centre (on the tree-free axis-16 path), facing outward.
   await page.evaluate(() => window.__hero!.teleport!(0, -170 - 69, 180));
   await page.bringToFront();
