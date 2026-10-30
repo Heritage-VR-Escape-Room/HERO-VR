@@ -160,7 +160,29 @@ function spectrumLenses(): Group {
   bridge.position.set(0, 0.04, 0);
   const strap = new Mesh(new BoxGeometry(0.2, 0.012, 0.06), leather);
   strap.position.set(0, 0.006, -0.03);
-  g.add(bridge, strap);
+  // Stamped under the strap (faces down: found by turning the lenses over).
+  const c = document.createElement('canvas');
+  c.width = 512;
+  c.height = 160;
+  const x = c.getContext('2d')!;
+  x.fillStyle = '#3b2516';
+  x.fillRect(0, 0, 512, 160);
+  x.strokeStyle = '#c9a36a';
+  x.lineWidth = 6;
+  x.strokeRect(14, 14, 484, 132);
+  x.fillStyle = '#d9b77a';
+  x.font = 'bold 54px "Noto Sans", sans-serif';
+  x.textAlign = 'center';
+  x.fillText('VANGUARD', 256, 74);
+  x.font = '34px "Noto Sans", sans-serif';
+  x.fillText('PROTOTYPE SL-7', 256, 124);
+  const stampTex = new CanvasTexture(c);
+  stampTex.colorSpace = SRGBColorSpace;
+  const stamp = new Mesh(new PlaneGeometry(0.17, 0.053), new MeshStandardNodeMaterial({ map: stampTex, roughness: 0.6 }));
+  stamp.name = 'lenses_stamp';
+  stamp.rotation.x = Math.PI / 2; // faces -Y
+  stamp.position.set(0, -0.0005, -0.03);
+  g.add(bridge, strap, stamp);
   g.traverse((o) => ((o as Mesh).isMesh ? ((o as Mesh).castShadow = true) : undefined));
   return g;
 }

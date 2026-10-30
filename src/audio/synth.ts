@@ -20,7 +20,9 @@ export type SfxName =
   | 'cough'
   | 'bike_bell'
   | 'dog_bark'
-  | 'pigeon_flutter';
+  | 'pigeon_flutter'
+  | 'inspect_lift'
+  | 'inspect_found';
 
 const noiseCache = new WeakMap<BaseAudioContext, AudioBuffer>();
 
@@ -192,6 +194,15 @@ export function sfx(v: Voice, name: SfxName): void {
       break;
     case 'pigeon_flutter':
       for (let i = 0; i < 9; i++) noise(v, 'bandpass', 700 + Math.random() * 600, 0.9, 0.3, 0.004, 0.05, t + i * 0.055);
+      break;
+    case 'inspect_lift':
+      noise(v, 'bandpass', 1400, 0.8, 0.12, 0.03, 0.18);
+      break;
+    case 'inspect_found':
+      // A soft discovery chime.
+      tone(v, 'sine', 880, 880, 0.12, 0.01, 0.9);
+      tone(v, 'sine', 1318.5, 1318.5, 0.09, 0.01, 1.1, t + 0.12);
+      tone(v, 'sine', 1760, 1760, 0.06, 0.01, 1.3, t + 0.24);
       break;
     case 'cough':
       // Two dry coughs: a voiced burst through a throat formant.

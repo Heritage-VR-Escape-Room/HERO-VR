@@ -6,7 +6,7 @@
   "prompt.use": "Use",
   "prompt.read": "Read",
   "ui.lock.hint": "A / D or wheel: turn ring · Click a tumbler top / bottom: change letter · E or click handle: pull · Esc: step back",
-  "ui.inspect.hint": "Drag to rotate · Wheel to zoom · Esc to close",
+  "ui.inspect.hint": "Drag or stick: turn · Wheel or triggers: zoom · Esc / B: put back",
   "ui.document.close": "Close",
   "spk.julian": "Julian",
   "spk.fritz": "Fritz",
@@ -169,5 +169,8 @@
   "doc.newspaper.title": "Badische Abendpost: PORT SAID TO BLAME?",
   "doc.newspaper.body": "Third night of the white fog. Trains to the south stand still, flights are grounded, and the city's radios hiss.\n\n\"Sources close to the transit authority\" say the mist arrived on the wind from the Mediterranean, carried up from tankers at Port Said. A spokesman for the city repair crew said the fault lies \"entirely abroad\".\n\nNo scientist could be reached for comment.",
   "dlg.radio_back.police": "Wait... my radio. It's clear! Station, do you read me?",
-  "dlg.radio_back.local": "The phones are back! Listen, the church bells are on the radio!"
+  "dlg.radio_back.local": "The phones are back! Listen, the church bells are on the radio!",
+  "ui.inspect.hint_take": "Drag or stick: turn · Wheel or triggers: zoom · E / A: take · Esc / B: put back",
+  "inspect.lenses.found": "Stamped under the strap: VANGUARD · PROTOTYPE SL-7",
+  "note.lenses_stamp": "The Spectrum Lenses are stamped \"VANGUARD · PROTOTYPE SL-7\". Vanguard made them, so why hide them in the pyramid?"
 }

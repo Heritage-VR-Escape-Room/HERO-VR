@@ -241,7 +241,17 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
   state.onChange((s) => (s === 'paused' ? runner.pause() : runner.resume()));
 
   const modal = createModalSession({ pointerLock, controller, clearInput: () => keyboard.clear() });
-  const inspect = new InspectView({ renderer, camera: world.camera, post: world.post, modal, i18n, canvas });
+  const inspect = new InspectView({
+    renderer,
+    scene: world.scene,
+    camera: world.camera,
+    post: world.post,
+    modal,
+    i18n,
+    canvas,
+    takeKey: () => settings.get().bindings.interact,
+    onSound: (s) => audio.play(s),
+  });
   initDocumentView({ i18n, onOpenChange: (open) => (open ? modal.enter() : modal.exit()) });
   const interactor = new Interactor({
     physics,
@@ -283,10 +293,13 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
   const uvOverlay = document.createElement('div');
   uvOverlay.id = 'uv-overlay';
   document.body.append(uvOverlay);
+  /** Everything only the Spectrum Lenses show: the trail (the way) and each puzzle's UV solution. */
+  const uvReveals: import('three/webgpu').Object3D[] = [];
   const setLenses = (on: boolean): void => {
     lensesOn = on;
     uvOverlay.classList.toggle('on', on);
     if (trail) trail.root.visible = on;
+    for (const o of uvReveals) o.visible = on;
     audio.play('ui_click');
   };
   const talkTargets: Array<{ role: string; root: import('three/webgpu').Object3D }> = [];
@@ -322,6 +335,7 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
       },
     });
     circuit = board;
+    uvReveals.push(board.uvLayer);
     pyr.panelAnchor.add(board.root);
     interactor.register({ ...board.interactable, interact: () => (act0?.panelUsed(), board.interactable.interact()) });
     interactor.register({
@@ -345,7 +359,23 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
         act0?.lensesTaken();
       },
     });
-    interactor.register(lenses);
+    // Uncharted-style: lift the lenses, turn them over (a stamp hides under the strap), then take them.
+    interactor.register({
+      ...lenses,
+      promptKey: 'prompt.inspect',
+      interact: () =>
+        inspect.open(pyr.lenses, {
+          discover: {
+            localDir: new V3(0, -1, 0),
+            foundKey: 'inspect.lenses.found',
+            onFound: () => {
+              director.markDisabled('lenses_stamp');
+              director.autosave('lenses_stamp');
+            },
+          },
+          onTake: () => lenses.interact(),
+        }),
+    });
     director.registerDisableable(lenses.id, lenses.markPicked);
 
     trail = createUvTrail((x, z) => garden!.groundHeight(x, z));
@@ -500,12 +530,8 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
   const setActivePuzzle = (p: import('./companion/fritz').HintablePuzzle | null): void => {
     activePuzzle = p;
   };
-  // Hints come over Fritz's hologram communicator.
-  const holo = (await import('./ui/holo')).createHolo();
-  const requestHint = (): void => {
-    fritz.hint(activePuzzle);
-    holo.show('HOLO-LINK');
-  };
+  // Hints come from Fritz himself (the copper raven): his line, a caw, an outline.
+  const requestHint = (): void => fritz.hint(activePuzzle);
   window.addEventListener('keydown', (e) => {
     if (e.repeat || e.code !== settings.get().bindings.hint || state.get() !== 'playing') return;
     requestHint();
@@ -614,6 +640,10 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
       plug: (t: string) => circuit!.plugInto(t as import('./logic/circuit').Terminal),
     },
     lenses: () => lensesOn,
+    setLenses: (on: boolean) => setLenses(on),
+    inspectTurn: (dx: number, dy: number) => inspect.rotate(dx, dy),
+    inspectFound: () => inspect.discovered(),
+    inspectState: () => inspect.debugState(),
     padTaps: () => [...padTapLog],
     npcs: () => talkTargets.map((t) => ({ role: t.role, x: t.root.position.x, z: t.root.position.z, visible: t.root.visible })),
     journal: () => journalFor(director.state()),
@@ -673,6 +703,7 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
   const autoPick = (await import('./ui/menu')).createAutoPick(settings);
 
   // Gamepad buttons drive the same paths as the keyboard and mouse.
+  const PAPER_SCROLL_PX_PER_SEC = 900;
   const LOOK_PX_PER_SEC = 420; // mouse-pixel equivalent at full stick, scaled by the mouse sensitivity setting
   let padOutline = false;
   let padAnnounced = false;
@@ -726,16 +757,29 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
     }
     if (inspect.isOpen()) {
       const l = pad.look();
-      inspect.rotate(l.x * 500 * dt, l.y * 500 * dt);
-      if (pad.pressed(PAD.A) || pad.pressed(PAD.B)) tapKey('Escape');
+      const m = pad.move();
+      inspect.rotate((l.x + m.x) * 700 * dt, (l.y - m.y) * 700 * dt);
+      const zoom = (pad.isDown(PAD.LT) ? 1 : 0) - (pad.isDown(PAD.RT) ? 1 : 0);
+      if (zoom) inspect.zoom(zoom * 900 * dt);
+      if (pad.pressed(PAD.A) && inspect.canTake()) inspect.take();
+      else if (pad.pressed(PAD.B)) inspect.close();
       return;
     }
+    // Papers and the journal: either stick (or the D-pad) scrolls the page.
+    const scrollPage = (selector: string): void => {
+      const page = document.querySelector<HTMLElement>(selector);
+      if (!page) return;
+      const v = pad.look().y - pad.move().y + (pad.isDown(PAD.DOWN) ? 1 : 0) - (pad.isDown(PAD.UP) ? 1 : 0);
+      if (Math.abs(v) > 0.05) page.scrollTop += v * PAPER_SCROLL_PX_PER_SEC * dt;
+    };
     if (journal.isOpen()) {
+      scrollPage('.journal-page');
       if (pad.pressed(PAD.Y) || pad.pressed(PAD.B) || pad.pressed(PAD.BACK)) journal.close();
       return;
     }
     if (modal.isActive()) {
       // The document view.
+      scrollPage('#document-view .document-body');
       if (pad.pressed(PAD.A) || pad.pressed(PAD.B)) tapKey('Escape');
       return;
     }
@@ -769,6 +813,7 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
     controller.update(dt, alpha);
     garden?.update(); // debug viewpoint override and tree LOD, every tick so a capped frame never shows the player camera
     lock?.update(dt);
+    inspect.update(dt);
     if (intro) {
       // The intro's flight overrides the player camera.
       const p = intro.progress();

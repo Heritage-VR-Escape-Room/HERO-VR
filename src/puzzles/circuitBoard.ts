@@ -7,12 +7,14 @@
  * the jammer powers down and the compartment opens (via `onSolved`).
  */
 import {
+  AdditiveBlending,
   CanvasTexture,
   CatmullRomCurve3,
   CylinderGeometry,
   Group,
   MathUtils,
   Mesh,
+  MeshBasicMaterial,
   MeshStandardMaterial,
   Object3D,
   Plane,
@@ -137,6 +139,12 @@ export class CircuitBoard {
   readonly switchMeshes: Object3D[] = [];
   readonly terminalMeshes: Object3D[] = [];
   readonly plugMesh: Mesh;
+  /**
+   * Seen only through the Spectrum Lenses: the solution in UV ink: Anvin's
+   * glowing fingerprints on the switches and terminal he used, and the live
+   * route traced in violet.
+   */
+  readonly uvLayer = new Group();
 
   private c: Circuit = initialCircuit();
   private solved = false;
@@ -276,6 +284,8 @@ export class CircuitBoard {
     this.lamp.position.set(W / 2 - 0.03, H / 2 + 0.012, 0.01);
     this.root.add(this.lamp);
 
+    this.buildUvLayer();
+
     this.view.position.set(0, 0.02, 0.52);
     this.root.add(this.view);
 
@@ -335,6 +345,58 @@ export class CircuitBoard {
     this.hintEl.style.display = 'none';
     this.deps.onFocusChange?.(false);
     if (this.blend === 0) this.deps.modal.exit();
+  }
+
+  private buildUvLayer(): void {
+    const c = document.createElement('canvas');
+    c.width = PX;
+    c.height = PY;
+    const g = c.getContext('2d')!;
+    g.lineCap = 'round';
+    g.lineJoin = 'round';
+    g.strokeStyle = '#c58bff';
+    g.shadowColor = '#9a4dff';
+    g.shadowBlur = 30;
+    g.lineWidth = 10;
+    g.setLineDash([22, 16]);
+    const path = (pts: UV[]): void => {
+      g.beginPath();
+      pts.forEach(([u, v], i) => (i ? g.lineTo(u * PX, v * PY) : g.moveTo(u * PX, v * PY)));
+      g.stroke();
+    };
+    path(TRACES['A-C']!.pts);
+    path(TRACES['C-D']!.pts);
+    path(TRACES['D-B']!.pts);
+    path([NODE_UV.B, TERMINAL_UV.TR]);
+    g.setLineDash([]);
+    // Fingerprints: concentric whorls where Anvin's fingers touched.
+    const print = ([u, v]: UV, r: number): void => {
+      g.lineWidth = 3;
+      for (let k = 0; k < 6; k++) {
+        g.beginPath();
+        g.ellipse(u * PX, v * PY, r - k * 6, (r - k * 6) * 1.3, 0.4, 0, Math.PI * 2);
+        g.stroke();
+      }
+    };
+    print(TRACES['A-C']!.sw!, 40);
+    print(TRACES['D-B']!.sw!, 40);
+    print(TERMINAL_UV.TR, 44);
+    g.fillStyle = '#e2c2ff';
+    g.font = 'bold 40px "Noto Sans", sans-serif';
+    g.textAlign = 'center';
+    g.fillText('1  +  4  →  ↗', PX * 0.62, PY * 0.94);
+    const tex = new CanvasTexture(c);
+    tex.colorSpace = SRGBColorSpace;
+    const ink = new Mesh(
+      new PlaneGeometry(W, H),
+      new MeshBasicMaterial({ map: tex, transparent: true, blending: AdditiveBlending, depthWrite: false }),
+    );
+    ink.position.z = 0.02;
+    ink.renderOrder = 5;
+    this.uvLayer.add(ink);
+    this.uvLayer.name = 'circuit_uv';
+    this.uvLayer.visible = false;
+    this.root.add(this.uvLayer);
   }
 
   /** Gamepad selection order: switches 1-4, then the terminals clockwise from top-left. */

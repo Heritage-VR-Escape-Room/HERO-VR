@@ -31,6 +31,7 @@ export function journalFor(s: StoryState): Journal {
   if (beat('b_panel')) notes.push('note.lid');
   if (s.disabledObjects.includes('manifesto_read')) notes.push('note.manifesto');
   if (s.inventory.includes('spectrum_lenses')) notes.push('note.lenses');
+  if (s.disabledObjects.includes('lenses_stamp')) notes.push('note.lenses_stamp');
   if (beat('b_trails')) notes.push('note.trails');
   return { partKey: 'journal.part.prologue', goalKey: 'journal.goal.prologue', tasks, notes };
 }
@@ -53,6 +54,7 @@ export const USED_KEYS: readonly string[] = [
   'note.lid',
   'note.manifesto',
   'note.lenses',
+  'note.lenses_stamp',
   'note.trails',
   'ui.journal.title',
   'ui.journal.goal',

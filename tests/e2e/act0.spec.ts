@@ -55,6 +55,23 @@ async function talkTo(page: Page, role: string): Promise<void> {
   await use(page, `npc_${role}`, x, z, yaw, -3);
 }
 
+/** The lenses: lift them into the inspect view, turn them over to find the stamp, take them. */
+async function takeLenses(page: Page, findStamp = false): Promise<void> {
+  await use(page, 'spectrum_lenses', -0.2, -174, 0, -60);
+  await expect.poll(() => page.evaluate(() => window.__hero!.inspectOpen!())).toBe(true);
+  // Lifted into the hands.
+  await expect.poll(() => page.evaluate(() => window.__hero!.inspectState!().lift), { timeout: 10_000 }).toBe(1);
+  if (findStamp) {
+    // Turn them over: the stamp under the strap faces the player.
+    await page.evaluate(() => window.__hero!.inspectTurn!(0, 196));
+    await page.waitForTimeout(1500);
+    console.log('INSPECT', JSON.stringify(await page.evaluate(() => window.__hero!.inspectState!())));
+    await expect.poll(() => page.evaluate(() => window.__hero!.inspectFound!()), { timeout: 10_000 }).toBe(true);
+  }
+  await page.keyboard.press('KeyE');
+  await expect.poll(() => page.evaluate(() => window.__hero!.inventory!())).toContain('spectrum_lenses');
+}
+
 async function enter(page: Page, button: 'new' | 'continue', lang = 'en'): Promise<string[]> {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -144,7 +161,7 @@ async function playthrough(page: Page, lang: string, watchIntro: boolean): Promi
   await talkTo(page, 'anvin');
   if (lang === 'en') await expect.poll(() => subtitle(page)).toContain(en['talk.anvin.2']);
 
-  // The panel: Julian's line, the puzzle view, three hints over the holo-link.
+  // The panel: Julian's line, the puzzle view, three hints from Fritz.
   await page.waitForFunction(() => !window.__hero!.dialoguePlaying!(), undefined, { timeout: 45_000 });
   await use(page, 'circuit_bridge', -1.45, -174.6, 0, -22);
   await waitBeat(page, 'b_panel');
@@ -156,7 +173,7 @@ async function playthrough(page: Page, lang: string, watchIntro: boolean): Promi
       await expect.poll(() => subtitle(page)).toContain((en as Record<string, string>)[`hint.circuit.${i}`]!);
     }
     await page.evaluate(() => window.__hero!.setClock!(null));
-    await expect(page.locator('#holo')).toBeVisible();
+    await expect(page.locator('#holo')).toHaveCount(0); // no hologram raven, only the copper Fritz
   }
   await shot(page, 'circuit', lang);
   // A crossed red wire on a live node shorts the board.
@@ -187,8 +204,9 @@ async function playthrough(page: Page, lang: string, watchIntro: boolean): Promi
   await page.waitForTimeout(600);
   await page.keyboard.press('Escape');
   await page.waitForTimeout(500);
-  await use(page, 'spectrum_lenses', -0.2, -174, 0, -60);
+  await takeLenses(page, lang === 'en');
   await waitBeat(page, 'b_lenses');
+  if (lang === 'en') expect((await page.evaluate(() => window.__hero!.journal!())).notes).toContain('note.lenses_stamp');
   expect(await page.evaluate(() => window.__hero!.inventory!())).toEqual(['spectrum_lenses']);
 
   // The journal (J): goal, tasks, notes.
@@ -272,8 +290,7 @@ test('resume after the circuit', async ({ page }, info) => {
   }
   // Take the lenses, reload, Continue: held exactly once.
   await page.waitForTimeout(1500);
-  await use(page, 'spectrum_lenses', -0.2, -174, 0, -60);
-  await expect.poll(() => page.evaluate(() => window.__hero!.inventory!())).toEqual(['spectrum_lenses']);
+  await takeLenses(page);
   await page.waitForTimeout(500);
   const again = await enter(page, 'continue');
   expect(await page.evaluate(() => window.__hero!.inventory!())).toEqual(['spectrum_lenses']);

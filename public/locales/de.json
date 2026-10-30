@@ -6,7 +6,7 @@
   "prompt.use": "Benutzen",
   "prompt.read": "Lesen",
   "ui.lock.hint": "A / D oder Mausrad: Ring drehen · Klick oben / unten auf eine Scheibe: Buchstabe ändern · E oder Klick auf den Hebel: ziehen · Esc: zurück",
-  "ui.inspect.hint": "Ziehen zum Drehen · Mausrad zum Zoomen · Esc zum Schließen",
+  "ui.inspect.hint": "Ziehen oder Stick: drehen · Mausrad oder Trigger: zoomen · Esc / B: zurücklegen",
   "ui.document.close": "Schließen",
   "spk.julian": "Julian",
   "spk.fritz": "Fritz",
@@ -169,5 +169,8 @@
   "doc.newspaper.title": "Badische Abendpost: IST PORT SAID SCHULD?",
   "doc.newspaper.body": "Dritte Nacht des weißen Nebels. Züge nach Süden stehen still, Flüge sind gestrichen, und die Radios der Stadt rauschen.\n\n\"Kreise aus der Verkehrsbehörde\" sagen, der Nebel sei mit dem Wind vom Mittelmeer gekommen, von Tankern in Port Said. Ein Sprecher des städtischen Reparaturtrupps sagte, die Ursache liege \"vollständig im Ausland\".\n\nKein Wissenschaftler war für eine Stellungnahme zu erreichen.",
   "dlg.radio_back.police": "Moment... mein Funkgerät. Klar! Wache, hören Sie mich?",
-  "dlg.radio_back.local": "Die Telefone gehen wieder! Hör mal, die Kirchenglocken im Radio!"
+  "dlg.radio_back.local": "Die Telefone gehen wieder! Hör mal, die Kirchenglocken im Radio!",
+  "ui.inspect.hint_take": "Ziehen oder Stick: drehen · Mausrad oder Trigger: zoomen · E / A: nehmen · Esc / B: zurücklegen",
+  "inspect.lenses.found": "Unter dem Riemen gestempelt: VANGUARD · PROTOTYP SL-7",
+  "note.lenses_stamp": "Die Spektrallinsen tragen den Stempel \"VANGUARD · PROTOTYP SL-7\". Vanguard hat sie gebaut. Warum also in der Pyramide verstecken?"
 }

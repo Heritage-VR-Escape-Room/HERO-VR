@@ -92,6 +92,10 @@ export interface HeroHooks {
     plug(t: string): void;
   };
   lenses?: () => boolean;
+  setLenses?: (on: boolean) => void;
+  inspectTurn?: (dx: number, dy: number) => void;
+  inspectFound?: () => boolean;
+  inspectState?: () => { active: boolean; lift: number; closing: boolean; found: boolean; take: boolean; spin: number[] };
   padTaps?: () => string[];
   npcs?: () => Array<{ role: string; x: number; z: number; visible: boolean }>;
   journal?: () => { goalKey: string; tasks: Array<{ key: string; done: boolean }>; notes: string[] };
