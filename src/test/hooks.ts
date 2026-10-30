@@ -86,6 +86,17 @@ export interface HeroHooks {
   renderFps?: () => number;
   /** Whether the main menu (or a screen opened from it) is showing. */
   menuOpen?: () => boolean;
+  circuit?: {
+    state(): { focused: boolean; ready: boolean; solved: boolean; short: boolean; switches: boolean[]; jumper: string; live: string[] };
+    flip(i: number): void;
+    plug(t: string): void;
+  };
+  lenses?: () => boolean;
+  npcs?: () => Array<{ role: string; x: number; z: number; visible: boolean }>;
+  journal?: () => { goalKey: string; tasks: Array<{ key: string; done: boolean }>; notes: string[] };
+  journalOpen?: () => boolean;
+  introActive?: () => boolean;
+  followerOn?: () => boolean;
   audio?: { log(): string[]; state(): AudioContextState };
   stageTextures?: () => number;
   renderInfo?: () => { calls: number; triangles: number; geometries: number };

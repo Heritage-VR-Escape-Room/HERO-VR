@@ -28,7 +28,7 @@ export function createInventory(initial: readonly string[] = []): Inventory {
 }
 
 /** Story items in Act 0. Each has a display name under `item.<id>`. */
-export const ITEM_IDS = ['ticket_printer_part'] as const;
+export const ITEM_IDS = ['spectrum_lenses'] as const;
 
 export const itemNameKey = (id: string): string => `item.${id}`;
 

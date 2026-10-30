@@ -8,7 +8,7 @@ describe('plaza placement', () => {
     expect(PLAZA.bench.position).toEqual([6, 0, -150]);
     expect(PLAZA.kiosk.position).toEqual([-18, 0, -160]);
     expect(PLAZA.citizens.map((c) => c.position)).toEqual([
-      [10, 0, -185],
+      [-2.7, 0, -174.7], // Anvin, by the circuit panel
       [-8, 0, -195],
     ]);
   });

@@ -269,45 +269,105 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
     i18n,
     onSound: (name: import('./audio/synth').SfxName) => audio.play(name, { x: px, y: 0.9, z: pz - 3.3 }),
   };
+  // Act 0 (new script): the Circuit Bridge panel, the plaque, the manifesto, the Spectrum Lenses, people to talk to.
+  let circuit: import('./puzzles/circuitBoard').CircuitBoard | undefined;
+  let trail: ReturnType<typeof import('./world/uvTrail').createUvTrail> | undefined;
+  let lensesOn = false;
+  const uvOverlay = document.createElement('div');
+  uvOverlay.id = 'uv-overlay';
+  document.body.append(uvOverlay);
+  const setLenses = (on: boolean): void => {
+    lensesOn = on;
+    uvOverlay.classList.toggle('on', on);
+    if (trail) trail.root.visible = on;
+    audio.play('ui_click');
+  };
+  const talkTargets: Array<{ role: string; root: import('three/webgpu').Object3D }> = [];
+  let anvinRoot: import('three/webgpu').Object3D | null = null;
+  const { Vector3: V3 } = await import('three/webgpu');
+  const panelAt = new V3();
   if (plaza) {
-    const [{ CipherLock }, { createDocumentInteractable }, { createPickup }] = await Promise.all([
-      import('./puzzles/cipherLock'),
+    const [{ CircuitBoard }, { createDocumentInteractable }, { createPickup }, { createUvTrail }, { TALK }, { GROUPS }] = await Promise.all([
+      import('./puzzles/circuitBoard'),
       import('./interaction/documents'),
       import('./interaction/pickup'),
+      import('./world/uvTrail'),
+      import('./dialogue/beats'),
+      import('./world/colliders'),
     ]);
     const pyr = plaza.pyramid;
-    lock = new CipherLock({ ...lockDeps, parts: pyr.lockParts });
-    const lockUse = lock.interactable;
-    interactor.register({ ...lockUse, interact: () => (act0?.lockUsed(), lockUse.interact()) });
+    pyr.panelAnchor.getWorldPosition(panelAt);
+    const board = new CircuitBoard({
+      director,
+      modal,
+      camera: world.camera,
+      canvas,
+      target: window,
+      i18n,
+      onSound: (n) => audio.play(n, panelAt),
+      onFocusChange: (f) => audio.music(f ? 'puzzle_circuit' : 'act0'),
+      // Power restored: the jammer dies (its hum with it) and the compartment opens.
+      onSolved: (restored) => {
+        if (restored) audio.hum(false, jammerAt, true);
+        pyr.jammer.disable(restored);
+        pyr.openDoor(restored);
+      },
+    });
+    circuit = board;
+    pyr.panelAnchor.add(board.root);
+    interactor.register({ ...board.interactable, interact: () => (act0?.panelUsed(), board.interactable.interact()) });
     interactor.register({
       id: 'plaque',
       promptKey: 'prompt.inspect',
       object: pyr.plaque,
       canInteract: () => true,
-      // After Fritz has translated the Latin, the inspect view shows its meaning.
-      interact: () => (
-        act0?.plaqueInspected(),
-        inspect.open(pyr.plaque, {
-          textKey: director.state().firedBeats.includes('b5_latin_translation') ? 'plaque.latin_meaning' : undefined,
-        })),
+      interact: () => inspect.open(pyr.plaque),
     });
-    interactor.register(pyr.jammer.interactable);
-    director.registerDisableable('jammer', () => pyr.jammer.disable(true));
     const manifesto = createDocumentInteractable({ id: 'manifesto', docKey: 'vanguard_manifesto', object: pyr.manifesto });
     interactor.register({ ...manifesto, interact: () => (audio.play('paper_rustle'), act0?.manifestoRead(), manifesto.interact()) });
-    const part = createPickup({
-      id: 'ticket_printer_part',
-      itemId: 'ticket_printer_part',
-      object: pyr.ticketPart,
+    const lenses = createPickup({
+      id: 'spectrum_lenses',
+      itemId: 'spectrum_lenses',
+      object: pyr.lenses,
       inventory,
       onPicked: (id) => {
         audio.play('item_pickup');
         director.markDisabled(id);
         director.autosave(id);
+        act0?.lensesTaken();
       },
     });
-    interactor.register(part);
-    director.registerDisableable(part.id, part.markPicked);
+    interactor.register(lenses);
+    director.registerDisableable(lenses.id, lenses.markPicked);
+
+    trail = createUvTrail((x, z) => garden!.groundHeight(x, z));
+    world.scene.add(trail.root);
+
+    // People: E to talk; each talk plays the person's next line, cycling.
+    const roles: Record<string, string> = { kiosk_owner: 'owner', anvin: 'anvin', citizen_1: 'citizen' };
+    const talkNext: Record<string, number> = {};
+    for (const npc of plaza.npcs) {
+      const role = roles[npc.root.name];
+      if (!role) continue;
+      const p = npc.root.position;
+      physics.addStaticBox({ x: p.x, y: 0.95, z: p.z }, { x: 0.38, y: 0.95, z: 0.38 }, 0, { group: GROUPS.INTERACTABLE, id: `npc_${role}` });
+      talkTargets.push({ role, root: npc.root });
+      if (role === 'anvin') anvinRoot = npc.root;
+      interactor.register({
+        id: `npc_${role}`,
+        promptKey: 'prompt.talk',
+        object: npc.root,
+        canInteract: () => npc.root.visible && !runner.isPlaying(),
+        interact: () => {
+          // Anvin's first words are his script line.
+          if (role === 'anvin' && director.fire('b_anvin')) return;
+          const sets = TALK[role]!;
+          const i = talkNext[role] ?? 0;
+          talkNext[role] = (i + 1) % sets.length;
+          runner.play(sets[i]!);
+        },
+      });
+    }
   } else if (props.has('lock')) {
     const { createLockProp } = await import('./world/lockProp');
     lock = createLockProp(world.scene, physics, world.spawn, world.spawnYaw, lockDeps);
@@ -337,16 +397,39 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
   world.scene.add(fritz.root);
   const sx = world.spawn.x;
   const sz = world.spawn.z;
+  let follower: import('./companion/follow').Follower | null = null;
   if (plaza) {
     await plaza.attachFritz(fritz);
-    fritz.place(director.state().firedBeats.includes('b4_fritz_arrives') ? 'pyramid_tip' : 'lamp_3');
-    const [{ createAct0 }, { PLAZA }] = await Promise.all([import('./dialogue/act0'), import('./logic/plazaLayout')]);
+    fritz.place('lamp_3');
+    const [{ createAct0 }, { PLAZA }, { createFollower }, { TRAIL_END }] = await Promise.all([
+      import('./dialogue/act0'),
+      import('./logic/plazaLayout'),
+      import('./companion/follow'),
+      import('./world/uvTrail'),
+    ]);
+    follower = createFollower(fritz, (x, z) => garden!.groundHeight(x, z));
     const [kx, , kz] = PLAZA.kiosk.position;
+    const [ax, , az] = PLAZA.citizens[0]!.position;
     act0 = createAct0({
       director,
-      flyFritzTo: (id) => void fritz.flyTo(id),
+      // Down from his lamp onto the cobbles in front of the player, where they can see him.
+      fritzArrive: () => {
+        // 6 m ahead: far enough to clear the subtitle panel at the bottom of the view.
+        const b = (controller.yawDeg * Math.PI) / 180;
+        const s = { x: controller.position.x - Math.sin(b) * 6, z: controller.position.z + Math.cos(b) * 6 };
+        fritz.addPerch('intro', new Vector3(s.x, garden!.groundHeight(s.x, s.z), s.z), (controller.yawDeg + 180) % 360);
+        return fritz.flyTo('intro');
+      },
+      fritzFollow: (on) => (follower!.enabled = on),
+      anvinLeave: () => {
+        if (!anvinRoot) return;
+        anvinRoot.visible = false;
+        const c = anvinRoot.userData['collider'] as import('@dimforge/rapier3d-compat').Collider | undefined;
+        if (c) physics.removeCollider(c);
+        anvinRoot.userData['collider'] = undefined;
+      },
       showEndCard,
-      kiosk: { x: kx, z: kz },
+      places: { kiosk: { x: kx, z: kz }, anvin: { x: ax, z: az }, trailEnd: TRAIL_END },
     });
   } else if (props.has('perches')) {
     fritz.addPerch('p1', new Vector3(sx - 6, 1.2, sz + 2), 90);
@@ -372,11 +455,27 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
       targets: [[plaque], [plaque], [lock.parts.innerRing], lock.parts.tumblerFaces],
     };
   }
+  let circuitHint: import('./companion/fritz').HintablePuzzle | null = null;
+  if (circuit) {
+    const { CIRCUIT_HINT_KEYS, CIRCUIT_PUZZLE_ID } = await import('./puzzles/circuitBoard');
+    const sw = (n: number) => circuit!.root.getObjectByName(`switch_${n}`)!;
+    circuitHint = {
+      id: CIRCUIT_PUZZLE_ID,
+      hintKeys: CIRCUIT_HINT_KEYS,
+      scheduler: createHintScheduler(CIRCUIT_HINT_KEYS.length, 30),
+      targets: [[circuit.lid], [sw(1), sw(4)], [sw(1), sw(4), circuit.plugMesh, circuit.root.getObjectByName('terminal_TR')!]],
+    };
+  }
   let activePuzzle: import('./companion/fritz').HintablePuzzle | null = null;
   const setActivePuzzle = (p: import('./companion/fritz').HintablePuzzle | null): void => {
     activePuzzle = p;
   };
-  const requestHint = (): void => fritz.hint(activePuzzle);
+  // Hints come over Fritz's hologram communicator.
+  const holo = (await import('./ui/holo')).createHolo();
+  const requestHint = (): void => {
+    fritz.hint(activePuzzle);
+    holo.show('HOLO-LINK');
+  };
   window.addEventListener('keydown', (e) => {
     if (e.repeat || e.code !== settings.get().bindings.hint || state.get() !== 'playing') return;
     requestHint();
@@ -394,6 +493,51 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
   window.addEventListener('resize', () => {
     world.camera.aspect = window.innerWidth / window.innerHeight;
     world.camera.updateProjectionMatrix();
+  });
+
+  // Travel Journal (J) and the minimap.
+  const [{ createJournalView }, { journalFor, currentTask }, { createMinimap }] = await Promise.all([
+    import('./ui/journal'),
+    import('./logic/journal'),
+    import('./ui/minimap'),
+  ]);
+  const journal = createJournalView({ i18n, journal: () => journalFor(director.state()), onOpenChange: (open) => (open ? modal.enter() : modal.exit()) });
+  let minimap: ReturnType<typeof createMinimap> | null = null;
+  let markerFor: (task: string | null) => { x: number; z: number } | null = () => null;
+  const trailPoints = plaza ? (await import('./world/uvTrail')).TRAIL_POINTS : null;
+  if (plaza) {
+    const { PLAZA, lampPositions } = await import('./logic/plazaLayout');
+    const { TRAIL_END } = await import('./world/uvTrail');
+    const [kx, , kz] = PLAZA.kiosk.position;
+    const [bx, , bz] = PLAZA.bench.position;
+    minimap = createMinimap({
+      i18n,
+      plaza: { x: px, z: pz, radius: 35 },
+      features: [
+        { kind: 'pyramid', x: px, z: pz },
+        { kind: 'kiosk', x: kx, z: kz },
+        { kind: 'bench', x: bx, z: bz },
+        ...lampPositions().map((l) => ({ kind: 'lamp' as const, x: l.x, z: l.z })),
+      ],
+    });
+    const [ax, , az] = PLAZA.citizens[0]!.position;
+    markerFor = (task) =>
+      task === 'task.anvin'
+        ? { x: ax, z: az }
+        : task === 'task.circuit'
+          ? { x: panelAt.x, z: panelAt.z }
+          : task === 'task.compartment'
+            ? { x: px, z: pz - 3.3 }
+            : task === 'task.trail'
+              ? TRAIL_END
+              : null;
+  }
+  journal.refresh();
+  window.addEventListener('keydown', (e) => {
+    if (e.repeat) return;
+    if (e.code === 'KeyJ' && (journal.isOpen() || (state.get() === 'playing' && !modal.isActive()))) journal.toggle();
+    else if (e.code === 'Escape' && journal.isOpen()) journal.close();
+    else if (e.code === 'KeyL' && state.get() === 'playing' && !modal.isActive() && inventory.has('spectrum_lenses')) setLenses(!lensesOn);
   });
 
   let frames = 0;
@@ -434,6 +578,17 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
       disable: () => plaza.pyramid.jammer.interactable.interact(),
     } : undefined,
     plaqueLocale: () => plaza?.pyramid.plaqueText.drawnLocale() ?? null,
+    circuit: circuit && {
+      state: () => circuit!.state(),
+      flip: (i: number) => circuit!.flip(i),
+      plug: (t: string) => circuit!.plugInto(t as import('./logic/circuit').Terminal),
+    },
+    lenses: () => lensesOn,
+    npcs: () => talkTargets.map((t) => ({ role: t.role, x: t.root.position.x, z: t.root.position.z, visible: t.root.visible })),
+    journal: () => journalFor(director.state()),
+    journalOpen: () => journal.isOpen(),
+    introActive: () => intro !== null,
+    followerOn: () => follower?.enabled ?? false,
     activePuzzle: () => activePuzzle?.id ?? null,
     fogLightCount: () => world.fog.scatteringLights().length,
     teleport: (x: number, z: number, yaw: number, pitch = 0) => controller.teleport({ x, y: garden?.groundHeight(x, z) ?? 0, z }, yaw, pitch),
@@ -457,21 +612,37 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
     },
   });
 
-  if (act0 && opts.newGame) {
-    // Wake up: fade in from black, then Julian's first line.
-    const black = document.createElement('div');
-    black.style.cssText = 'position:fixed;inset:0;background:#000;pointer-events:none;z-index:50;transition:opacity 3s ease-in';
-    document.body.append(black);
-    requestAnimationFrame(() => requestAnimationFrame(() => (black.style.opacity = '0')));
-    black.addEventListener('transitionend', () => black.remove());
-  }
-  act0?.start(opts.newGame ?? false);
-  if (act0 && opts.newGame) audio.play('cough');
+  // New Game: the intro (title cards, then a flight down onto the plaza), then waking on the bench.
+  let intro: import('./ui/intro').Intro | null = null;
+  const flyFrom = new V3(30, 26, -212); // inside the slice, south-west of the plaza
+  const flyLook0 = new V3(px, 4, pz);
+  const flyTo = new V3();
+  const flyLook1 = new V3();
+  const flyLook = new V3();
+  if (act0 && plaza && opts.newGame) {
+    const { PLAZA } = await import('./logic/plazaLayout');
+    const wake = PLAZA.viewpoints.wake!;
+    flyTo.set(...wake.position);
+    flyLook1.set(...wake.target);
+    intro = (await import('./ui/intro')).playIntro(i18n);
+    void intro.done.then(() => {
+      intro = null;
+      // Wake up: fade in from black, a cough, then Julian's first line and Fritz.
+      const black = document.createElement('div');
+      black.style.cssText = 'position:fixed;inset:0;background:#000;pointer-events:none;z-index:50;transition:opacity 3s ease-in';
+      document.body.append(black);
+      requestAnimationFrame(() => requestAnimationFrame(() => (black.style.opacity = '0')));
+      black.addEventListener('transitionend', () => black.remove());
+      audio.play('cough');
+      act0!.start(true);
+    });
+  } else act0?.start(false);
 
   // First launch: measure this machine in the game itself and pick a preset.
   const autoPick = (await import('./ui/menu')).createAutoPick(settings);
 
   const fixed = createFixedStep(PHYSICS_HZ, MAX_SUBSTEPS);
+  let journalT = 0;
   let lastTick: number | null = null;
   let lastRender = 0;
   await renderer.setAnimationLoop((t: number) => {
@@ -486,17 +657,53 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
     controller.update(dt, alpha);
     garden?.update(); // debug viewpoint override and tree LOD, every tick so a capped frame never shows the player camera
     lock?.update(dt);
+    if (intro) {
+      // The intro's flight overrides the player camera.
+      const p = intro.progress();
+      if (p !== null) {
+        const e = p * p * (3 - 2 * p);
+        world.camera.position.lerpVectors(flyFrom, flyTo, e);
+        world.camera.position.y += Math.sin(p * Math.PI) * 6;
+        world.camera.lookAt(flyLook.lerpVectors(flyLook0, flyLook1, e));
+      }
+    }
+    if (circuit && circuitHint) {
+      circuit.update(dt);
+      const cs = circuit.state();
+      const active = !cs.solved && lockIsActive(controller.position, panelAt, cs.focused);
+      if (active !== (activePuzzle === circuitHint)) setActivePuzzle(active ? circuitHint : null);
+    }
+    trail?.update(dt);
+    follower?.update(controller.position, controller.yawDeg);
     if (lockHint) {
       const door = plaza ? plaza.pyramid.doorCenter : lock!.parts.root.position;
       const active = lockIsActive(controller.position, door, lock!.state().focused);
       if (active !== (activePuzzle === lockHint)) setActivePuzzle(active ? lockHint : null);
     }
     plaza?.update(dt, world.camera.position);
-    act0?.update(controller.position, lock?.state().solved ?? false);
+    act0?.update(controller.position, circuit?.state().solved ?? false, lensesOn);
+    journalT += dt;
+    if (journalT > 0.25) {
+      journalT = 0;
+      journal.refresh();
+    }
+    if (minimap) {
+      const st = state.get();
+      minimap.setVisible(!intro && !endCard.isOpen() && st === 'playing' && !modal.isActive());
+      minimap.draw(
+        {
+          player: { x: controller.position.x, z: controller.position.z, yawDeg: controller.yawDeg },
+          marker: markerFor(currentTask(journalFor(director.state()))),
+          trail: lensesOn ? trailPoints : null,
+          npcs: talkTargets.filter((t) => t.root.visible).map((t) => ({ x: t.root.position.x, z: t.root.position.z })),
+        },
+        dt,
+      );
+    }
     fritz.update(dt);
     interactor.update();
     const st = state.get();
-    hud.setMode(endCard.isOpen() ? 'hidden' : st === 'playing' && !modal.isActive() ? 'playing' : st === 'menu' ? 'click-to-play' : 'hidden');
+    hud.setMode(intro || endCard.isOpen() ? 'hidden' : st === 'playing' && !modal.isActive() ? 'playing' : st === 'menu' ? 'click-to-play' : 'hidden');
     // The first-launch benchmark measures uncapped; afterwards the cap applies.
     if (!autoPick.running() && !shouldRender(t, lastRender, frameCap)) return;
     lastRender = t;

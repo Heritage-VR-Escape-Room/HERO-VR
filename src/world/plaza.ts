@@ -189,17 +189,19 @@ export async function createPlaza(deps: PlazaDeps, p: PlazaPlacement = PLAZA): P
     npc.root.position.set(x, 0, z);
     npc.root.rotation.y = facingRad(facing);
     root.add(npc.root);
-    physics.addStaticCylinder({ x, y: 0.88, z }, 0.88, 0.28);
+    // Kept on the NPC so a person who leaves the plaza (Anvin) stops blocking the way.
+    npc.root.userData['collider'] = physics.addStaticCylinder({ x, y: 0.88, z }, 0.88, 0.28);
     npcs.push(npc);
     return npc;
   };
   const ownerOff = p.kiosk.owner.offset;
   // The owner faces out over the plaza, shouting at passers-by. The death clip is never played.
   addNpc(ownerModel, kx + out.x * ownerOff, kz + out.z * ownerOff, kioskFacing, 'shout', 0, 0).root.name = 'kiosk_owner';
-  // The two citizens glare at each other across the plaza (and at the player up close).
+  // A citizen glares at Anvin across the plaza (and at the player up close).
   const [c0, c1] = p.citizens;
   if (c0 && c1) {
-    addNpc(citizenModels[0]!, c0.position[0], c0.position[2], bearingToward(c0.position, c1.position), 'glare', T_POSE_ARMS_DOWN_DEG, 1).root.name = 'citizen_0';
+    // Anvin, "city repair crew", by the circuit panel on the pyramid's base, facing the plaza.
+    addNpc(citizenModels[0]!, c0.position[0], c0.position[2], bearingToward(c0.position, [0, 0, -182]), 'glare', T_POSE_ARMS_DOWN_DEG, 1).root.name = 'anvin';
     addNpc(citizenModels[1]!, c1.position[0], c1.position[2], bearingToward(c1.position, c0.position), 'glare', T_POSE_ARMS_DOWN_DEG, 2).root.name = 'citizen_1';
   }
 
@@ -237,6 +239,9 @@ export async function createPlaza(deps: PlazaDeps, p: PlazaPlacement = PLAZA): P
             m.colorNode = color(FRITZ_COPPER).mul(luminance(t.rgb).mul(2.4).add(0.3));
             m.opacityNode = t.a;
           } else m.color.set(FRITZ_COPPER);
+          // A faint warm glow of clockwork heat, so he reads against dark cobbles at night.
+          m.emissive.set(FRITZ_COPPER);
+          m.emissiveIntensity = 0.35;
           return m;
         };
         m.material = Array.isArray(m.material) ? m.material.map(tint) : tint(m.material);

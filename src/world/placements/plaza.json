@@ -21,7 +21,7 @@
     ]
   },
   "citizens": [
-    { "model": "human_npc_m2", "position": [10, 0, -185] },
+    { "model": "human_npc_m2", "position": [-2.7, 0, -174.7] },
     { "model": "human_npc_f", "position": [-8, 0, -195] }
   ],
   "lamps": { "model": "streetlamp", "ring": 22, "count": 8, "firstBearing": 0, "headY": 3.8, "topY": 4.5 },

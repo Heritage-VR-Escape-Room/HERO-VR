@@ -79,7 +79,8 @@ function doorHeightMap(letters: string): CanvasTexture {
   return t;
 }
 
-export function buildPyramidLock(brassSet: PbrSet, engraved = 'YOFZ'): LockParts {
+/** `withDial: false` builds a plain compartment door (engraving, handle and hinges, no cipher dial or tumblers). */
+export function buildPyramidLock(brassSet: PbrSet, engraved = 'YOFZ', withDial = true): LockParts {
   const root = new Group();
   root.name = 'cipher_lock';
 
@@ -108,7 +109,7 @@ export function buildPyramidLock(brassSet: PbrSet, engraved = 'YOFZ'): LockParts
   // Dial: a backing boss, the fixed outer A-Z ring, the rotating inner disc, a centre cap and a pointer at 12 o'clock.
   const dial = new Group();
   dial.position.set(0, DIAL_Y, front);
-  face.add(dial);
+  if (withDial) face.add(dial);
   const body = new Mesh(new CylinderGeometry(RING.outer + 0.02, RING.outer + 0.025, 0.02, 64), brass('#4a3719', 0.55));
   body.rotation.x = Math.PI / 2;
   body.position.z = 0.01;
@@ -130,7 +131,7 @@ export function buildPyramidLock(brassSet: PbrSet, engraved = 'YOFZ'): LockParts
   // Four tumblers in a housing below the dial.
   const housing = new Mesh(new BoxGeometry(0.4, 0.15, 0.03), brass('#4a3719', 0.55));
   housing.position.set(0, TUMBLER_Y, front + 0.015);
-  face.add(housing);
+  if (withDial) face.add(housing);
   const tumblerFaces: Mesh[] = [];
   const draws: Array<(t: string) => void> = [];
   for (let i = 0; i < TUMBLER_COUNT; i++) {
@@ -139,7 +140,7 @@ export function buildPyramidLock(brassSet: PbrSet, engraved = 'YOFZ'): LockParts
     const f = new Mesh(new PlaneGeometry(0.072, 0.11), lit(lab.tex as CanvasTexture));
     f.position.set(x, TUMBLER_Y, front + 0.031);
     f.userData['tumbler'] = i;
-    face.add(f);
+    if (withDial) face.add(f);
     tumblerFaces.push(f);
     draws.push(lab.draw);
   }

@@ -41,7 +41,7 @@ import { meterBox } from './schloss';
 
 export const PLAQUE_ID = 'plaque';
 export const MANIFESTO_ID = 'manifesto';
-export const TICKET_PART_ID = 'ticket_printer_part';
+export const LENSES_ID = 'spectrum_lenses';
 /** Warm 2700 K tungsten. */
 const ALCOVE_COLOR = '#ffa957';
 const ALCOVE_POWER = 40;
@@ -71,7 +71,11 @@ export interface Pyramid {
   plaqueText: LocalizedCanvasTexture;
   jammer: Jammer;
   manifesto: Mesh;
-  ticketPart: Group;
+  lenses: Group;
+  /** Where the circuit panel hangs on the plinth's south face (board front = local +Z). */
+  panelAnchor: Group;
+  /** Swing the compartment door open (instant when restoring a save). */
+  openDoor(instant?: boolean): void;
   /** World centre of the door opening's front. */
   doorCenter: Vector3;
   /** Per frame: the door's swing lights the alcove and clears the door colliders once it is half open. */
@@ -134,27 +138,30 @@ function paperTexture(): CanvasTexture {
   return t;
 }
 
-function ticketPrinterPart(): Group {
+/** The Spectrum Lenses: brass-rimmed goggles with violet UV glass on a leather strap. */
+function spectrumLenses(): Group {
   const g = new Group();
-  g.name = TICKET_PART_ID;
-  const steel = darkSteel('TicketPartSteel');
-  const brass = new MeshStandardNodeMaterial({ color: '#a8823f', roughness: 0.35, metalness: 0.9 });
-  const plate = new Mesh(new BoxGeometry(0.17, 0.02, 0.11), steel);
-  plate.position.y = 0.01;
-  const roller = new Mesh(new CylinderGeometry(0.018, 0.018, 0.13, 16), brass);
-  roller.rotation.z = Math.PI / 2;
-  roller.position.set(0, 0.04, -0.02);
-  const gear = new Mesh(new CylinderGeometry(0.035, 0.035, 0.012, 12), brass);
-  gear.rotation.z = Math.PI / 2;
-  gear.position.set(0.075, 0.045, 0.01);
-  const paper = new Mesh(
-    new PlaneGeometry(0.05, 0.07),
-    new MeshStandardNodeMaterial({ color: '#cfc6ae', roughness: 0.9, side: DoubleSide }),
-  );
-  paper.rotation.x = -1.1;
-  paper.position.set(-0.02, 0.05, 0.03);
-  for (const m of [plate, roller, gear, paper]) m.castShadow = true;
-  g.add(plate, roller, gear, paper);
+  g.name = LENSES_ID;
+  const brass = new MeshStandardNodeMaterial({ color: '#b08a45', roughness: 0.3, metalness: 0.9 });
+  const glass = new MeshStandardNodeMaterial({ color: '#7a3cff', roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.75 });
+  glass.emissive.set('#5a1fd1');
+  glass.emissiveIntensity = 1.6;
+  const leather = new MeshStandardNodeMaterial({ color: '#3b2516', roughness: 0.85 });
+  for (const x of [-0.045, 0.045]) {
+    const rim = new Mesh(new CylinderGeometry(0.032, 0.032, 0.022, 20, 1, true), brass);
+    rim.rotation.x = Math.PI / 2;
+    rim.position.set(x, 0.03, 0);
+    const lens = new Mesh(new CylinderGeometry(0.029, 0.029, 0.004, 20), glass);
+    lens.rotation.x = Math.PI / 2;
+    lens.position.set(x, 0.03, 0.01);
+    g.add(rim, lens);
+  }
+  const bridge = new Mesh(new BoxGeometry(0.03, 0.008, 0.01), brass);
+  bridge.position.set(0, 0.04, 0);
+  const strap = new Mesh(new BoxGeometry(0.2, 0.012, 0.06), leather);
+  strap.position.set(0, 0.006, -0.03);
+  g.add(bridge, strap);
+  g.traverse((o) => ((o as Mesh).isMesh ? ((o as Mesh).castShadow = true) : undefined));
   return g;
 }
 
@@ -283,7 +290,8 @@ export function createPyramid(place: PlazaPlacement['pyramid'], deps: PyramidDep
   }
 
   // Brass door with the lock, in the opening's front plane.
-  const lockParts = buildPyramidLock(deps.bronze);
+  // The compartment door: plain brass engraved with the founding year (MDCCXV = 1715).
+  const lockParts = buildPyramidLock(deps.bronze, 'MDCCXV', false);
   lockParts.root.position.set(0, sill + door.height / 2, -H);
   lockParts.root.rotation.y = Math.PI;
   root.add(lockParts.root);
@@ -294,12 +302,13 @@ export function createPyramid(place: PlazaPlacement['pyramid'], deps: PyramidDep
     0,
     { surface: 'metal' },
   );
-  const lockHit: RAPIER.Collider | null = physics.addStaticBox(
-    world(0, sill + door.height / 2, -H - 0.04),
-    { x: dw, y: door.height / 2, z: 0.04 },
-    0,
-    { group: GROUPS.INTERACTABLE, id: 'cipher_lock' },
-  );
+  // The circuit panel, on the plinth face to the right of the door (seen from the south).
+  const panelAnchor = new Group();
+  panelAnchor.name = 'panel_anchor';
+  panelAnchor.position.set(-1.45, sill + 0.7, -H - 0.005);
+  panelAnchor.rotation.y = Math.PI;
+  root.add(panelAnchor);
+  physics.addStaticBox(world(-1.45, sill + 0.7, -H - 0.1), { x: 0.36, y: 0.3, z: 0.1 }, 0, { group: GROUPS.INTERACTABLE, id: 'circuit_bridge' });
   // The player never steps into the alcove (reach-in only); not a WORLD occluder.
   physics.addStaticBox(world(0, sill + door.height / 2, (-H + back) / 2), { x: dw, y: door.height / 2, z: (back + H) / 2 }, 0, {
     group: GROUPS.BLOCKER,
@@ -329,13 +338,15 @@ export function createPyramid(place: PlazaPlacement['pyramid'], deps: PyramidDep
   root.add(manifesto);
   physics.addStaticBox(world(0.22, sill + 0.02, -H + 0.22), { x: 0.12, y: 0.03, z: 0.16 }, 0, { group: GROUPS.INTERACTABLE, id: MANIFESTO_ID });
 
-  const ticketPart = ticketPrinterPart();
-  ticketPart.position.set(-0.24, sill, -H + 0.2);
-  ticketPart.rotation.y = 2.6;
-  root.add(ticketPart);
-  physics.addStaticBox(world(-0.24, sill + 0.04, -H + 0.2), { x: 0.1, y: 0.05, z: 0.09 }, 0, { group: GROUPS.INTERACTABLE, id: TICKET_PART_ID });
+  const lenses = spectrumLenses();
+  lenses.position.set(-0.24, sill, -H + 0.2);
+  lenses.rotation.y = Math.PI + 0.3;
+  root.add(lenses);
+  physics.addStaticBox(world(-0.24, sill + 0.04, -H + 0.2), { x: 0.11, y: 0.05, z: 0.09 }, 0, { group: GROUPS.INTERACTABLE, id: LENSES_ID });
 
-  let doorColliders: Array<RAPIER.Collider | null> = [doorWorld, lockHit];
+  let doorColliders: Array<RAPIER.Collider | null> = [doorWorld];
+  let doorT = -1; // seconds into the swing; -1 = closed
+  const DOOR_SEC = 1.2;
   return {
     root,
     lockParts,
@@ -343,9 +354,19 @@ export function createPyramid(place: PlazaPlacement['pyramid'], deps: PyramidDep
     plaqueText,
     jammer,
     manifesto,
-    ticketPart,
+    lenses,
+    panelAnchor,
     doorCenter,
+    openDoor(instant = false) {
+      if (doorT < 0 || instant) doorT = instant ? DOOR_SEC : 0;
+    },
     update(dt: number): void {
+      if (doorT >= 0 && doorT <= DOOR_SEC) {
+        doorT = Math.min(DOOR_SEC, doorT + dt);
+        const t = doorT / DOOR_SEC;
+        lockParts.doorPivot.rotation.y = -DOOR_SWING_RAD * t * t * (3 - 2 * t);
+        if (doorT >= DOOR_SEC) doorT = DOOR_SEC + 1;
+      }
       const doorOpen = MathUtils.clamp(-lockParts.doorPivot.rotation.y / DOOR_SWING_RAD, 0, 1);
       alcoveLight.intensity = (ALCOVE_POWER / (4 * Math.PI)) * Math.min(1, doorOpen * 1.5);
       if (doorOpen >= 0.5 && doorColliders.length) {

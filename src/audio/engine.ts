@@ -19,7 +19,8 @@ export interface AudioEngine {
   footstep(surface: Surface): void;
   /** Start the night ambience (game only). */
   ambience(opts: { humAt: Vec3 }): void;
-  hum(on: boolean, at: Vec3): void;
+  /** The jammer's hum; `quiet` stops it without the shutdown sound (save restore). */
+  hum(on: boolean, at: Vec3, quiet?: boolean): void;
   /** Crossfade to a theme (null: silence). */
   music(id: ThemeId | null): void;
   setVolumes(v: Volumes): void;
@@ -75,12 +76,12 @@ export function createAudio(volumes: Volumes): AudioEngine {
     ambience(opts) {
       startAmbience(ctx, m.ambience, opts);
     },
-    hum(on, at) {
+    hum(on, at, quiet = false) {
       note(on ? 'jammer_hum_start' : 'jammer_hum_stop');
       if (!on) {
         humNode?.stop();
         humNode = null;
-        this.play('jammer_off', at);
+        if (!quiet) this.play('jammer_off', at);
         return;
       }
       if (humNode) return;
