@@ -9,6 +9,7 @@
     "plaque": { "width": 1.2, "height": 0.8, "centerY": 2.25 }
   },
   "bench": { "model": "bench", "position": [6, 0, -150] },
+  "monument": { "model": "prinz_wilhelm", "position": [5, 0, -104], "facing": 180 },
   "kiosk": {
     "model": "kiosk",
     "position": [-18, 0, -160],

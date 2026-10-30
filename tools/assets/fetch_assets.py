@@ -250,7 +250,7 @@ def cmd_fetch(a: argparse.Namespace) -> None:
     for e in m["entries"]:
         if a.only and e["slug"] not in a.only:
             continue
-        if e["source"] in ("code", "alias"):
+        if e["source"] in ("code", "alias", "team-scan"):
             continue
         if e.get("existing"):
             print(f"skip {e['slug']}: already in public/assets ({e['existing']})")

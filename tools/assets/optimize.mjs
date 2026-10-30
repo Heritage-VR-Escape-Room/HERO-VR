@@ -111,7 +111,7 @@ async function optimizeTexture(e) {
 
 for (const e of manifest.entries) {
   if (only && !only.includes(e.slug)) continue;
-  if (e.kind === 'model' && e.source === 'sketchfab') optimizeModel(e);
+  if (e.kind === 'model' && (e.source === 'sketchfab' || e.source === 'team-scan')) optimizeModel(e);
   else if (e.kind === 'texture') await optimizeTexture(e);
 }
 if (!existsSync(join(root, 'public', 'assets'))) process.exit(1);

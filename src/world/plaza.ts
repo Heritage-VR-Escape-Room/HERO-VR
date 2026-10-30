@@ -19,7 +19,7 @@ import {
 import { color, luminance, texture } from 'three/tsl';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import type { I18n } from '../logic/i18n';
-import { bearingVector } from '../logic/worldLayout';
+import { bearingVector, heightAt } from '../logic/worldLayout';
 import { bearingToward, lampPositions, PLAZA, type PlazaPlacement } from '../logic/plazaLayout';
 import { LAMP_COLOR, type LightingRig } from '../render/lighting';
 import type { OrbitViewpoint } from '../render/menuBackdrop';
@@ -107,13 +107,14 @@ export async function createPlaza(deps: PlazaDeps, p: PlazaPlacement = PLAZA): P
   const root = new Group();
   root.name = 'Plaza';
 
-  const [sandstone, bronze, lampModel, benchModel, kioskModel, paperModel, ownerModel, ...citizenModels] = await Promise.all([
+  const [sandstone, bronze, lampModel, benchModel, kioskModel, paperModel, monumentModel, ownerModel, ...citizenModels] = await Promise.all([
     loadPbrSet('tex_sandstone_red', '4k'),
     loadPbrSet('tex_bronze_patina', '4k'),
     loadModel(p.lamps.model),
     loadModel(p.bench.model),
     loadModel(p.kiosk.model),
     loadModel('newspapers'),
+    loadModel(p.monument.model),
     loadModel(p.kiosk.owner.model),
     ...p.citizens.map((c) => loadModel(c.model)),
   ]);
@@ -154,6 +155,14 @@ export async function createPlaza(deps: PlazaDeps, p: PlazaPlacement = PLAZA): P
     rig.addStreetlamp(new Vector3(l.x, p.lamps.headY, l.z));
     physics.addStaticCylinder({ x: l.x, y: p.lamps.topY / 2, z: l.z }, p.lamps.topY / 2, 0.16, { surface: 'metal' });
   });
+
+  // The Prinz Wilhelm von Baden monument (the team's scan) beside the path north to the palace.
+  const [mx, , mz] = p.monument.position;
+  const monument = placeModel(monumentModel.scene, mx, heightAt(mx, mz), mz, p.monument.facing);
+  monument.name = 'monument_prinz_wilhelm';
+  root.add(monument);
+  // The pedestal's footprint (the base plinth is 3.8 m square).
+  physics.addStaticBox({ x: mx, y: heightAt(mx, mz) + 1.5, z: mz }, { x: 1.4, y: 1.5, z: 1.4 }, facingRad(p.monument.facing));
 
   // Wake bench, facing the pyramid.
   const [bx, , bz] = p.bench.position;

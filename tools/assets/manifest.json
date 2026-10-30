@@ -423,6 +423,25 @@
       "license": "CC-BY 4.0",
       "url": "https://sketchfab.com/3d-models/pigeon-ddd5ef4a94eb4159937a9de25c45697c",
       "faces": 6928
+    },
+    {
+      "slot": "prinz_wilhelm",
+      "kind": "model",
+      "source": "team-scan",
+      "id": "Prinz Wilhelm von Baden.zip",
+      "slug": "prinz_wilhelm",
+      "targetSize": {
+        "axis": "height",
+        "meters": 6.2
+      },
+      "maxTris": 60000,
+      "fix": {
+        "yaw": 90
+      },
+      "title": "Prinz Wilhelm von Baden monument (team scan)",
+      "author": "HERO-VR team",
+      "license": "Team-owned scan",
+      "url": "n/a"
     }
   ]
 }

@@ -25,6 +25,8 @@ export interface PlazaPlacement {
     plaque: { width: number; height: number; centerY: number };
   };
   bench: { model: string; position: V3 };
+  /** The Prinz Wilhelm von Baden monument (team scan) on the way north to the palace. */
+  monument: { model: string; position: V3; facing: number };
   kiosk: {
     model: string;
     position: V3;
