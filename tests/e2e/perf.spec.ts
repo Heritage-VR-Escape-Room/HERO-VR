@@ -12,8 +12,8 @@ test.beforeEach(({}, info) => {
 const PRESETS: readonly string[] = process.env.PERF_VARIANTS ? Object.keys(JSON.parse(process.env.PERF_VARIANTS)) : ['Low', 'Medium', 'High'];
 // The preset table with the frame cap removed (custom graphics), see logic/presets.ts.
 const UNCAPPED: Record<string, object> = process.env.PERF_VARIANTS ? JSON.parse(process.env.PERF_VARIANTS) : {
-  Low: { renderScale: 0.67, shadows: 'Low', fog: 'Low', ssao: false, aa: 'FXAA', motionBlur: false, frameCap: 0 },
-  Medium: { renderScale: 0.85, shadows: 'Medium', fog: 'Medium', ssao: true, aa: 'SMAA', motionBlur: false, frameCap: 0 },
+  Low: { renderScale: 0.67, shadows: 'Off', fog: 'Low', ssao: false, aa: 'FXAA', motionBlur: false, frameCap: 0 },
+  Medium: { renderScale: 0.85, shadows: 'Low', fog: 'Medium', ssao: true, aa: 'SMAA', motionBlur: false, frameCap: 0 },
   High: { renderScale: 1.0, shadows: 'High', fog: 'High', ssao: true, aa: 'TAA', motionBlur: false, frameCap: 0 },
 };
 
