@@ -26,6 +26,7 @@ import { applyGraphics } from './render/liveGraphics';
 import { createSettingsScreen, type SettingsScreen } from './ui/settingsScreen';
 import { createCredits } from './ui/credits';
 import { codeLabel } from './ui/dom';
+import { createAudio, type AudioEngine } from './audio/engine';
 
 type SettingsService = ReturnType<typeof createSettingsService>;
 type SaveService = ReturnType<typeof createSaveService>;
@@ -45,6 +46,7 @@ interface Session {
   settingsScreen: SettingsScreen;
   /** Rendered frames per second over the last 3 s (any scene). */
   meter: ReturnType<typeof createFpsMeter>;
+  audio: AudioEngine;
 }
 
 /**
@@ -145,7 +147,7 @@ type GameScene = 'flat' | 'garden';
  * gameplay updates every tick; rendering is gated by the cap.
  */
 async function startGame(session: Session, sceneName: GameScene, opts: { newGame?: boolean } = {}): Promise<void> {
-  const { renderer, canvas, settings, backend, i18n, params, inventory, director, runner, meter } = session;
+  const { renderer, canvas, settings, backend, i18n, params, inventory, director, runner, meter, audio } = session;
   const [
     { PhysicsWorld },
     { createFlatWorld },
@@ -184,11 +186,15 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
       : null;
   const world = garden ?? (await createFlatWorld(renderer, physics, effectiveGraphics(settings, backend)));
   // The Act 0 plaza stands on the garden's plaza disc.
+  const { PLAZA: plazaPlace } = await import('./logic/plazaLayout');
+  const [px, , pz] = plazaPlace.pyramid.position;
+  const jammerAt = { x: px, y: 0.4, z: pz - 3.1 }; // just inside the door, south face
   const plaza = garden
     ? await (await import('./world/plaza')).createPlaza({
         physics,
         i18n,
         rig: world.rig,
+        onJammerSound: (s) => audio.hum(s === 'jammer_hum_start', jammerAt),
         onJammerDisabled: () => {
           director.markDisabled('jammer');
           director.autosave('jammer');
@@ -196,6 +202,8 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
       })
     : null;
   if (garden && plaza) {
+    // Hum from the fog around the pyramid; sirens 300 m to the south-west (west = +X).
+    audio.ambience({ humAt: { x: px, y: 3, z: pz }, sirensAt: { x: px + 212, y: 5, z: pz - 212 } });
     world.scene.add(plaza.root);
     for (const [name, vp] of Object.entries(plaza.viewpoints)) garden.addViewpoint(name, vp);
     world.fog.syncLights(); // the plaza's lamps join the fog (nearest ones, capped)
@@ -258,6 +266,7 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
     target: window,
     bindings: () => settings.get().bindings,
     i18n,
+    onSound: (name: import('./audio/synth').SfxName) => audio.play(name, { x: px, y: 0.9, z: pz - 3.3 }),
   };
   if (plaza) {
     const [{ CipherLock }, { createDocumentInteractable }, { createPickup }] = await Promise.all([
@@ -284,13 +293,14 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
     interactor.register(pyr.jammer.interactable);
     director.registerDisableable('jammer', () => pyr.jammer.disable(true));
     const manifesto = createDocumentInteractable({ id: 'manifesto', docKey: 'vanguard_manifesto', object: pyr.manifesto });
-    interactor.register({ ...manifesto, interact: () => (act0?.manifestoRead(), manifesto.interact()) });
+    interactor.register({ ...manifesto, interact: () => (audio.play('paper_rustle'), act0?.manifestoRead(), manifesto.interact()) });
     const part = createPickup({
       id: 'ticket_printer_part',
       itemId: 'ticket_printer_part',
       object: pyr.ticketPart,
       inventory,
       onPicked: (id) => {
+        audio.play('item_pickup');
         director.markDisabled(id);
         director.autosave(id);
       },
@@ -318,7 +328,10 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
     director,
     highlight: world.highlight,
     now,
-    onSound: () => cawCount++,
+    onSound: (name) => {
+      cawCount++;
+      audio.play(name, fritz.position);
+    },
   });
   world.scene.add(fritz.root);
   const sx = world.spawn.x;
@@ -384,6 +397,7 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
 
   let frames = 0;
   const steps: string[] = [];
+  controller.footsteps.onStep((s) => audio.footstep(s));
   if (isTestMode()) controller.footsteps.onStep((s) => steps.push(s));
   installHooks({
     frames: () => frames,
@@ -451,6 +465,7 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
     black.addEventListener('transitionend', () => black.remove());
   }
   act0?.start(opts.newGame ?? false);
+  if (act0 && opts.newGame) audio.play('cough');
 
   // First launch: measure this machine in the game itself and pick a preset.
   const autoPick = (await import('./ui/menu')).createAutoPick(settings);
@@ -485,6 +500,7 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
     if (!autoPick.running() && !shouldRender(t, lastRender, frameCap)) return;
     lastRender = t;
     world.rig.update(world.camera.position);
+    audio.update(world.camera);
     world.post.render();
     inspect.render();
     frames++;
@@ -521,6 +537,22 @@ async function startMenu(session: Session): Promise<void> {
     onNewGame: () => enterGame(false),
   });
   menu.show();
+  // Menu sounds: hover ticks and clicks on every button, a soft drone once audio may start.
+  const { audio } = session;
+  document.addEventListener('mouseover', (e) => {
+    if ((e.target as Element | null)?.closest?.('button')) audio.play('ui_hover');
+  });
+  document.addEventListener('click', (e) => {
+    if ((e.target as Element | null)?.closest?.('button')) audio.play('ui_click');
+  });
+  let drone = false;
+  const startDrone = (): void => {
+    if (drone) return;
+    drone = true;
+    audio.menuMusic();
+  };
+  window.addEventListener('pointerdown', startDrone, { once: true });
+  window.addEventListener('keydown', startDrone, { once: true });
 
   let frames = 0;
   installHooks({
@@ -598,7 +630,10 @@ async function boot(): Promise<void> {
     runner,
     settingsScreen: createSettingsScreen({ i18n, settings, backend }),
     meter: createFpsMeter(3000),
+    audio: createAudio(settings.get().volumes),
   };
+  settings.onChange((s) => session.audio.setVolumes(s.volumes));
+  installHooks({ audio: { log: () => [...session.audio.log()], state: () => session.audio.state() } });
 
   const scene = params.get('scene');
   const play = params.get('play');

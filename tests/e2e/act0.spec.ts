@@ -61,6 +61,10 @@ async function playToOpenDoor(page: Page, lang: string, hints: boolean): Promise
   await expect.poll(() => subtitle(page)).not.toBe('');
   await shot(page, lang, 'b1');
   await playing(page);
+  // A few real steps off the bench (footstep sounds).
+  await page.keyboard.down('KeyW');
+  await page.waitForTimeout(1500);
+  await page.keyboard.up('KeyW');
 
   // b2 near the kiosk.
   await page.evaluate(() => window.__hero!.teleport!(-12, -160, 270));
@@ -138,6 +142,14 @@ for (const lang of ['en', 'ar', 'de']) {
     const errors = await enter(page, 'new', lang);
     await playToOpenDoor(page, lang, lang === 'en');
     await finishAlcove(page, lang);
+    if (lang === 'en') {
+      // Every Act 0 sound fired, and audio runs after the first click.
+      expect(await page.evaluate(() => window.__hero!.audio!.state())).toBe('running');
+      const log = await page.evaluate(() => window.__hero!.audio!.log());
+      for (const n of ['cough', 'raven_caw', 'ring_tick', 'lock_clunk', 'step_cobble', 'steam', 'jammer_hum_start', 'jammer_hum_stop', 'paper_rustle', 'item_pickup']) {
+        expect(log, n).toContain(n);
+      }
+    }
     if (lang === 'en' && info.project.name === 'default') await page.screenshot({ path: 'docs/screenshots/slice/act0-end.png' });
     expect(errors).toEqual([]);
   });
