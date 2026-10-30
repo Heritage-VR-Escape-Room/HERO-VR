@@ -5,6 +5,8 @@ const use = {
   headless: false,
   viewport: { width: 1920, height: 1080 },
   baseURL: 'http://localhost:4173',
+  // Test windows are visible (WebGPU needs a headed Chrome); keep them silent.
+  launchOptions: { args: ['--mute-audio'] as string[] },
 } as const;
 
 export default defineConfig({
@@ -20,7 +22,7 @@ export default defineConfig({
     { name: 'default', use: { ...use } },
     {
       name: 'no-webgpu',
-      use: { ...use, launchOptions: { args: ['--disable-features=WebGPU'] } },
+      use: { ...use, launchOptions: { args: ['--mute-audio', '--disable-features=WebGPU'] } },
     },
   ],
 });

@@ -114,15 +114,16 @@ export class Npc {
       turn(j.spine, sway);
     }
 
-    // Arms: lowered out of the T-pose; the owner waves his right arm (a paper in hand) on each shout.
+    // Arms: lowered out of the T-pose, hanging slightly behind the body; the owner holds a newspaper up at chest height and shakes it on each shout.
     const down = MathUtils.degToRad(this.opts.armsDownDeg ?? 0);
     const breathe = 0.03 * Math.sin(t * 1.3);
-    if (j.armL) turn(j.armL, about(this.fwd, -(down + breathe), _d));
+    const back = 0.12; // upper arms a little behind the torso, as they hang naturally
+    if (j.armL) turn(j.armL, about(this.fwd, -(down + breathe), _d).multiply(about(this.left, back, _a)));
     if (j.armR) {
-      const raise = shout ? 1.1 + 0.5 * beat : 0;
+      const raise = shout ? 0.45 + 0.15 * beat : -back;
       turn(j.armR, about(this.fwd, down + breathe).multiply(about(this.left, -raise, _a)));
     }
-    if (j.foreR && shout) turn(j.foreR, about(this.left, -0.6 - 0.5 * beat, _d));
+    if (j.foreR && shout) turn(j.foreR, about(this.left, -0.9 - 0.2 * beat, _d));
 
     // Head: glare at the player within 6 m (yaw clamped to 70 degrees), else look ahead.
     const head = j.head;
