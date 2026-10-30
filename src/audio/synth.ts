@@ -167,11 +167,10 @@ export function sfx(v: Voice, name: SfxName): void {
       tone(v, 'sine', 900, 700, 0.12, 0.002, 0.08);
       break;
     case 'bike_bell':
-      // Two quick rings of a bicycle bell: a bright bell partial set.
+      // Two quick rings of a bicycle bell, faint (somewhere out in the fog).
       for (const at of [t, t + 0.16]) {
-        tone(v, 'sine', 2350, 2340, 0.18, 0.002, 0.6, at);
-        tone(v, 'sine', 3720, 3700, 0.09, 0.002, 0.4, at);
-        noise(v, 'highpass', 5000, 1, 0.05, 0.001, 0.02, at);
+        tone(v, 'sine', 2350, 2340, 0.045, 0.002, 0.5, at);
+        tone(v, 'sine', 3720, 3700, 0.02, 0.002, 0.35, at);
       }
       break;
     case 'dog_bark':

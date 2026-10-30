@@ -15,8 +15,10 @@ interface Theme {
   pad: { type: OscillatorType; gain: number; cutoff: number };
   lead: { type: OscillatorType; gain: number; decay: number };
   bass: number;
-  /** A ticking clockwork pulse on every eighth (puzzles). */
+  /** A ticking clockwork pulse on every eighth. */
   tick: boolean;
+  /** Echo on the melody (a feedback delay). */
+  echo?: { time: number; feedback: number; wet: number };
 }
 
 const _ = null;
@@ -56,25 +58,27 @@ export const THEMES: Record<ThemeId, Theme> = {
     bass: 0.08,
     tick: false,
   },
-  // Puzzles: tense A minor, a clockwork tick and a busy arpeggio.
+  // Puzzles: mysterious. Slow, unresolved chords (Dm add9, Bbmaj7#11, Gm add9,
+  // A7b9) under a few glassy high notes that echo away into the fog.
   puzzle_circuit: {
-    bpm: 96,
+    bpm: 46,
     chords: [
-      [45, 48, 52, 57], // Am
-      [41, 45, 48, 53], // F
-      [43, 47, 50, 55], // G
-      [40, 44, 47, 52], // E
+      [50, 57, 64, 65],
+      [46, 57, 62, 64],
+      [43, 50, 57, 58],
+      [45, 55, 58, 61],
     ],
     melody: [
-      [4, 5, 6, 5, 4, 5, 6, 7],
-      [4, 5, 6, 5, 4, 5, 6, 5],
-      [4, 5, 6, 7, 6, 5, 4, 5],
-      [4, 6, 5, 7, 6, 8, 7, 6],
+      [3, _, _, _, _, _, _, _],
+      [_, _, 2, _, _, _, _, _],
+      [_, _, _, _, 3, _, 1, _],
+      [_, _, _, _, _, _, 2, _],
     ],
-    pad: { type: 'sawtooth', gain: 0.025, cutoff: 600 },
-    lead: { type: 'triangle', gain: 0.04, decay: 0.25 },
-    bass: 0.09,
-    tick: true,
+    pad: { type: 'sine', gain: 0.045, cutoff: 650 },
+    lead: { type: 'sine', gain: 0.045, decay: 2.8 },
+    bass: 0.05,
+    tick: false,
+    echo: { time: 0.48, feedback: 0.45, wet: 0.5 },
   },
   // Main menu: the Act 0 theme, sparser and slower.
   menu: {
@@ -128,6 +132,22 @@ export function createMusic(ctx: AudioContext, out: AudioNode): Music {
     gain.gain.setValueAtTime(0.0001, ctx.currentTime);
     gain.gain.linearRampToValueAtTime(1, ctx.currentTime + 2);
     gain.connect(out);
+    // The melody goes through an optional echo.
+    let leadOut: AudioNode = gain;
+    if (th.echo) {
+      const delay = ctx.createDelay(2);
+      delay.delayTime.value = th.echo.time;
+      const fb = ctx.createGain();
+      fb.gain.value = th.echo.feedback;
+      const wet = ctx.createGain();
+      wet.gain.value = th.echo.wet;
+      const send = ctx.createGain();
+      send.connect(gain);
+      send.connect(delay);
+      delay.connect(fb).connect(delay);
+      delay.connect(wet).connect(gain);
+      leadOut = send;
+    }
     const padFilter = ctx.createBiquadFilter();
     padFilter.type = 'lowpass';
     padFilter.frequency.value = th.pad.cutoff;
@@ -145,7 +165,7 @@ export function createMusic(ctx: AudioContext, out: AudioNode): Music {
         note(gain, 'sine', hz(chord[0]! - 12), barStart, th.bass, 0.02, barLen * 0.8);
         th.melody[i % th.melody.length]!.forEach((m, k) => {
           const at = barStart + (k * beat) / 2;
-          if (m !== null) note(gain, th.lead.type, hz(chordNote(chord, m) + 12), at, th.lead.gain, 0.01, th.lead.decay);
+          if (m !== null) note(leadOut, th.lead.type, hz(chordNote(chord, m) + 12), at, th.lead.gain, 0.01, th.lead.decay);
           if (th.tick) note(gain, 'square', k % 2 ? 3200 : 2400, at, 0.012, 0.001, 0.02);
         });
         barStart += barLen;

@@ -61,7 +61,7 @@ export interface PlazaLife {
   update(dt: number, player: Vector3): void;
 }
 
-const T_POSE_ARMS_DOWN_DEG = 86;
+const T_POSE_ARMS_DOWN_DEG = 80;
 const facing = (from: XZ, to: XZ): number => Math.atan2(to.x - from.x, to.z - from.z);
 
 function placeNpc(n: Npc, at: XZ, look: XZ, groundAt: LifeDeps['groundAt']): void {

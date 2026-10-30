@@ -15,8 +15,9 @@ import type { GLTF } from './assets';
 
 export const GLARE_RADIUS_M = 6;
 export const GLARE_MAX_DEG = 70;
-/** Forearms turned in toward the body after lowering a T-pose. */
-const FOREARM_IN_RAD = 0.45;
+/** How far out from the body the hanging arm and forearm point (fraction of straight down). */
+const ARM_OUT = 0.1;
+const FOREARM_OUT = 0.04;
 /** Forearm twist that turns a lowered T-pose's palms from facing forward to facing the thighs. */
 const PALM_TWIST_RAD = 1.4;
 /** Arms lowered more than this come from a T-pose (an A-pose rig only needs a small drop). */
@@ -56,6 +57,9 @@ const _d = new Quaternion();
 const _a = new Quaternion();
 const _v = new Vector3();
 const _elbow = new Vector3();
+const _target = new Vector3();
+const _dir = new Vector3();
+const _ident = new Quaternion();
 
 /** Frustum-cull a skinned mesh against its bind-pose sphere, enlarged, never recomputed. */
 export function cullWithFixedSphere(m: SkinnedMesh, scale = 1.6): void {
@@ -177,23 +181,33 @@ export class Npc {
       turn(j.spine, sway);
     }
 
-    // Arms hang at the sides, a little behind the torso. The owner shouts with
-    // his body and head, not his arms (a raised open hand read as a strange gesture).
-    const down = MathUtils.degToRad(this.opts.armsDownDeg ?? 0);
-    const breathe = 0.03 * Math.sin(t * 1.3);
-    const back = 0.12;
-    // Swing (about the left axis): negative raises a hanging arm forward.
-    const swingL = b === 'ride' ? -1.0 : b === 'police' ? 0.35 : b === 'argue' && !jabRight ? -0.9 * jab : back;
-    const swingR = b === 'ride' ? -1.0 : b === 'police' ? 0.35 : cough > 0 ? -1.25 * cough : b === 'argue' && jabRight ? -0.9 * jab : back;
-    if (j.armL) turn(j.armL, about(this.left, swingL, _a).multiply(about(this.fwd, -(down + breathe), _d)));
-    if (j.armR) turn(j.armR, about(this.left, swingR, _a).multiply(about(this.fwd, down + breathe, _d)));
-    // A T-pose's palms face down; lowered, they would face forward. Twist each
-    // forearm about its length so the palms turn to the thighs, and bring the
-    // slight outward elbow bend in against the body.
-    if (down > T_POSE_MIN_RAD && b !== 'ride') {
-      if (j.foreL) this.forearm(j.foreL, FOREARM_IN_RAD, PALM_TWIST_RAD);
-      if (j.foreR) this.forearm(j.foreR, -FOREARM_IN_RAD, -PALM_TWIST_RAD);
+    // Arms: every rig rests differently (T-pose, A-pose, bent elbows), so the
+    // standing arms are aimed rather than rotated by fixed angles: the upper
+    // arm and the forearm point straight down along the side of the body, the
+    // palm turned in to the thigh. Gestures (an argument, a cough, the
+    // policeman's hands behind his back) swing the aimed arm about the left axis.
+    const breathe = 0.02 * Math.sin(t * 1.3);
+    if (b === 'ride') {
+      const down = MathUtils.degToRad(this.opts.armsDownDeg ?? 0);
+      if (j.armL) turn(j.armL, about(this.left, -1.0, _a).multiply(about(this.fwd, -down, _d)));
+      if (j.armR) turn(j.armR, about(this.left, -1.0, _a).multiply(about(this.fwd, down, _d)));
+    } else {
+      const swingL = b === 'police' ? 0.3 : b === 'argue' && !jabRight ? -0.9 * jab : 0.04 + breathe;
+      const swingR = b === 'police' ? 0.3 : cough > 0 ? -1.25 * cough : b === 'argue' && jabRight ? -0.9 * jab : 0.04 + breathe;
+      for (const [arm, fore, side, swing] of [
+        [j.armL, j.foreL, 1, swingL],
+        [j.armR, j.foreR, -1, swingR],
+      ] as const) {
+        if (!arm) continue;
+        // Straight down, a hand's width out from the hip, a touch behind the body line.
+        this.aim(arm, _target.copy(this.up).negate().addScaledVector(this.left, side * ARM_OUT).addScaledVector(this.fwd, -0.03), swing);
+        if (fore) {
+          this.aim(fore, _target.copy(this.up).negate().addScaledVector(this.left, side * FOREARM_OUT).addScaledVector(this.fwd, 0.06), 0);
+          this.twistPalm(fore, side * PALM_TWIST_RAD);
+        }
+      }
     }
+
     // Elbows: a cough brings the hand up to the mouth; an argument bends the jabbing arm.
     if (j.foreR && cough > 0) turn(j.foreR, about(this.left, -1.5 * cough, _d));
     else if (b === 'argue' && jab > 0.05) {
@@ -239,6 +253,34 @@ export class Npc {
       // Turning about +Y by +yaw swings +Z (forward) toward +X (left).
       turn(head, about(this.up, this.lookYaw).multiply(about(this.left, -this.lookPitch + nod, _a)));
     }
+  }
+
+  /**
+   * Turn a bone (from its rest pose under its current parent) so it points
+   * along `dir` (world), then swing it about the NPC's left axis.
+   */
+  private aim(j: Joint, dir: Vector3, swing: number): void {
+    turn(j, _ident);
+    const child = j.bone.children.find((c) => (c as Bone).isBone);
+    if (!child) return;
+    j.bone.getWorldPosition(_elbow);
+    child.getWorldPosition(_v).sub(_elbow).normalize();
+    const point = new Quaternion().setFromUnitVectors(_v, _dir.copy(dir).normalize());
+    turn(j, new Quaternion().setFromAxisAngle(this.left, swing).multiply(point));
+  }
+
+  /** Twist an aimed forearm about its own length (elbow to wrist) to turn the palm. */
+  private twistPalm(j: Joint, twistRad: number): void {
+    const child = j.bone.children.find((c) => (c as Bone).isBone);
+    if (!child) return;
+    j.bone.getWorldPosition(_elbow);
+    child.getWorldPosition(_v).sub(_elbow).normalize();
+    // Compose onto the bone's current world rotation (turn() rebases on rest).
+    const cur = j.bone.getWorldQuaternion(new Quaternion());
+    j.bone.parent!.getWorldQuaternion(_pq);
+    const restWorld = _pq.clone().multiply(j.rest);
+    const delta = cur.multiply(restWorld.invert());
+    turn(j, new Quaternion().setFromAxisAngle(_v, twistRad).multiply(delta));
   }
 
   /**

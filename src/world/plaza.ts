@@ -40,9 +40,9 @@ const KIOSK_LAMP = { color: '#ffc27a', power: 260, distance: 7, height: 2.5, out
 /** Copper tint for Fritz (spec §9: copper patina on Fritz). */
 const FRITZ_COPPER = '#b06a3c';
 /** Arms out of the Renderpeople T-pose (degrees). */
-const T_POSE_ARMS_DOWN_DEG = 86;
+const T_POSE_ARMS_DOWN_DEG = 80;
 /** The owner's rig rests in an A-pose: a small drop brings the arms to his sides. */
-const OWNER_ARMS_DOWN_DEG = 10;
+const OWNER_ARMS_DOWN_DEG = 5;
 
 export interface PlazaDeps {
   physics: PhysicsWorld;
