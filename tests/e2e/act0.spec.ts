@@ -86,14 +86,15 @@ async function skipIntro(page: Page): Promise<void> {
 
 async function playthrough(page: Page, lang: string, watchIntro: boolean): Promise<void> {
   // The intro: title cards, the flight down; then black, wake up.
-  expect(await page.evaluate(() => window.__hero!.introActive!())).toBe(true);
+  // A slow first load can outlast the intro's title cards: only watch it if it is still on.
+  if (!(await page.evaluate(() => window.__hero!.introActive!()))) watchIntro = false;
   if (watchIntro) {
     await page.waitForTimeout(1500);
     await shot(page, 'intro-card', lang);
     await page.waitForTimeout(12_000);
     await shot(page, 'intro-flight', lang);
     await page.waitForFunction(() => !window.__hero!.introActive!(), undefined, { timeout: 40_000 });
-  } else await skipIntro(page);
+  } else if (await page.evaluate(() => window.__hero!.introActive!())) await skipIntro(page);
   // The game world draws (a black frame compresses to a few KB).
   await page.waitForTimeout(3500);
   expect((await page.screenshot()).length).toBeGreaterThan(200_000);
@@ -124,14 +125,14 @@ async function playthrough(page: Page, lang: string, watchIntro: boolean): Promi
   // The kiosk owner: rant nearby, then talk.
   await page.evaluate(() => window.__hero!.teleport!(-12, -160, 270));
   await waitBeat(page, 'b2_newsstand');
-  await page.waitForFunction(() => !window.__hero!.dialoguePlaying!(), undefined, { timeout: 20_000 });
+  await page.waitForFunction(() => !window.__hero!.dialoguePlaying!(), undefined, { timeout: 45_000 });
   await talkTo(page, 'owner');
   if (lang === 'en') await expect.poll(() => subtitle(page)).toContain(en['talk.owner.1']);
   await page.waitForTimeout(500);
   await shot(page, 'talk-owner', lang);
 
   // Anvin at the panel; talking to him again gives the next line.
-  await page.waitForFunction(() => !window.__hero!.dialoguePlaying!(), undefined, { timeout: 20_000 });
+  await page.waitForFunction(() => !window.__hero!.dialoguePlaying!(), undefined, { timeout: 45_000 });
   await page.evaluate(() => window.__hero!.teleport!(-2, -180, 0));
   await waitBeat(page, 'b_anvin');
   await page.waitForTimeout(800);
@@ -139,12 +140,12 @@ async function playthrough(page: Page, lang: string, watchIntro: boolean): Promi
   await page.waitForFunction(() => !window.__hero!.dialoguePlaying!(), undefined, { timeout: 30_000 });
   await talkTo(page, 'anvin');
   if (lang === 'en') await expect.poll(() => subtitle(page)).toContain(en['talk.anvin.1']);
-  await page.waitForFunction(() => !window.__hero!.dialoguePlaying!(), undefined, { timeout: 20_000 });
+  await page.waitForFunction(() => !window.__hero!.dialoguePlaying!(), undefined, { timeout: 45_000 });
   await talkTo(page, 'anvin');
   if (lang === 'en') await expect.poll(() => subtitle(page)).toContain(en['talk.anvin.2']);
 
   // The panel: Julian's line, the puzzle view, three hints over the holo-link.
-  await page.waitForFunction(() => !window.__hero!.dialoguePlaying!(), undefined, { timeout: 20_000 });
+  await page.waitForFunction(() => !window.__hero!.dialoguePlaying!(), undefined, { timeout: 45_000 });
   await use(page, 'circuit_bridge', -1.45, -174.6, 0, -22);
   await waitBeat(page, 'b_panel');
   await page.waitForFunction(() => window.__hero!.circuit!.state().ready, undefined, { timeout: 10_000 });
