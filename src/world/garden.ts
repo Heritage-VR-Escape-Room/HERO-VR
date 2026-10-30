@@ -345,12 +345,24 @@ export async function createGarden(
   const sphereCenter = new Vector3();
   const sphere = { center: sphereCenter, radius: 0 };
   let last = { lod0: 0, lod1: 0, impostor: 0 };
+  // The visible set is recomputed only when the camera has moved or turned,
+  // and the instance buffers are re-uploaded only when that set changed.
+  const lastPos = new Vector3(Infinity, 0, 0);
+  const lastDir = new Vector3();
+  const dir = new Vector3();
+  let dirty = true;
+  const shown = bySpecies.map((list) => [new Int32Array(list.length).fill(-1), new Int32Array(list.length).fill(-1)]);
 
   return {
     root,
     trees,
     update(camera: Camera): void {
       camera.updateMatrixWorld();
+      camera.getWorldDirection(dir);
+      if (!dirty && camera.position.distanceToSquared(lastPos) < 0.04 && dir.dot(lastDir) > 0.9998) return;
+      dirty = false;
+      lastPos.copy(camera.position);
+      lastDir.copy(dir);
       vp.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
       frustum.setFromProjectionMatrix(vp);
       const cx = camera.position.x;
@@ -363,6 +375,8 @@ export async function createGarden(
         const n = [0, 0];
         const mats = matrices[si]!;
         const [m0, m1] = [lods[si]![0]!.meshes, lods[si]![1]!.meshes];
+        const prev = shown[si]!;
+        const changed = [false, false];
         list.forEach((t, i) => {
           const dx = t.x - cx;
           const dz = t.z - cz;
@@ -376,12 +390,16 @@ export async function createGarden(
           if (!frustum.intersectsSphere(sphere as never)) return;
           const lod = d2 < l0 ? 0 : 1;
           const slot = n[lod]!++;
+          if (prev[lod]![slot] === i) return;
+          prev[lod]![slot] = i;
+          changed[lod] = true;
           for (const im of lod === 0 ? m0 : m1) im.instanceMatrix.array.set(mats.subarray(i * 16, i * 16 + 16), slot * 16);
         });
         for (const [lod, ms] of [m0, m1].entries()) {
           for (const im of ms) {
+            if (im.count !== n[lod]) changed[lod] = true;
             im.count = n[lod]!;
-            im.instanceMatrix.needsUpdate = true;
+            if (changed[lod] && n[lod]! > 0) im.instanceMatrix.needsUpdate = true;
           }
         }
         counts.lod0 += n[0]!;
@@ -391,6 +409,7 @@ export async function createGarden(
     },
     setDetail(next: TreeDetailLevel): void {
       detail = config.detail[next];
+      dirty = true;
       impostorStart.value = detail.lod1;
       applyShadows();
     },

@@ -34,3 +34,8 @@ const TABLE: Record<GraphicsPreset, GraphicsOptions> = {
 export function presetOptions(p: GraphicsPreset): GraphicsOptions {
   return { ...TABLE[p] };
 }
+
+/** Texture resolution per preset: 1k sets fit integrated GPUs; 4k only on Ultra. */
+export function textureResFor(p: GraphicsPreset): '1k' | '2k' | '4k' {
+  return p === 'Ultra' ? '4k' : p === 'High' ? '2k' : '1k';
+}

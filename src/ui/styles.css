@@ -559,3 +559,23 @@
     transition: none !important;
   }
 }
+
+/* ---- Main menu still backdrop ------------------------------------------ */
+body.menu-still {
+  background: #0b0f12;
+}
+body.menu-still::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: url('/menu-backdrop.webp') center / cover no-repeat;
+  animation: menu-drift 40s ease-in-out infinite alternate;
+  z-index: 0;
+}
+@keyframes menu-drift {
+  from { transform: scale(1.02) translateX(0); }
+  to { transform: scale(1.1) translateX(-1.5%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.menu-still::before { animation: none; }
+}

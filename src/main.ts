@@ -19,6 +19,8 @@ import { DialogueRunner } from './dialogue/runner';
 import { StoryDirector } from './dialogue/director';
 import { createSubtitles } from './ui/subtitles';
 import { loadModel, setAssetRenderer } from './world/assets';
+import { setTextureBudget } from './world/pbr';
+import { textureResFor } from './logic/presets';
 import { createFpsMeter } from './logic/fpsMeter';
 import { applyGraphics } from './render/liveGraphics';
 import { createSettingsScreen, type SettingsScreen } from './ui/settingsScreen';
@@ -435,6 +437,9 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
   }
   act0?.start(opts.newGame ?? false);
 
+  // First launch: measure this machine in the game itself and pick a preset.
+  const autoPick = (await import('./ui/menu')).createAutoPick(settings);
+
   const fixed = createFixedStep(PHYSICS_HZ, MAX_SUBSTEPS);
   let lastTick: number | null = null;
   let lastRender = 0;
@@ -461,13 +466,15 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
     interactor.update();
     const st = state.get();
     hud.setMode(endCard.isOpen() ? 'hidden' : st === 'playing' && !modal.isActive() ? 'playing' : st === 'menu' ? 'click-to-play' : 'hidden');
-    if (!shouldRender(t, lastRender, frameCap)) return;
+    // The first-launch benchmark measures uncapped; afterwards the cap applies.
+    if (!autoPick.running() && !shouldRender(t, lastRender, frameCap)) return;
     lastRender = t;
     world.rig.update(world.camera.position);
     world.post.render();
     inspect.render();
     frames++;
     meter.tick(t);
+    autoPick.tick(t);
   });
 }
 
@@ -476,37 +483,18 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
  * backdrop down and start the game world (`flat` until Task 16 wires Act 0).
  */
 async function startMenu(session: Session): Promise<void> {
-  const { renderer, settings, backend, i18n, save, director, meter } = session;
-  const [{ createMenuBackdrop }, { createMainMenu, createAutoPick }, { plazaBackdrop }] = await Promise.all([
-    import('./render/menuBackdrop'),
-    import('./ui/menu'),
-    import('./world/plazaBackdrop'),
-  ]);
-  // The menu background is the plaza from its `menu_orbit` viewpoint.
-  const backdrop = await createMenuBackdrop(renderer, effectiveGraphics(settings, backend), plazaBackdrop(i18n));
-  const { world } = backdrop;
-  const autoPick = createAutoPick(settings);
-
-  let frameCap = effectiveGraphics(settings, backend).frameCap;
-  const unsubSettings = settings.onChange(() => {
-    const g = effectiveGraphics(settings, backend);
-    frameCap = g.frameCap;
-    applyGraphics(world, g);
-  });
-  const resize = (): void => {
-    world.camera.aspect = window.innerWidth / window.innerHeight;
-    world.camera.updateProjectionMatrix();
-  };
-  window.addEventListener('resize', resize);
-
-  // The menu world shares cached models and textures with the game world, so
-  // it is never torn down in place: the game starts on a fresh page instead.
+  const { renderer, canvas, i18n, save } = session;
+  const { createMainMenu } = await import('./ui/menu');
+  // The menu background is a still of the plaza (menu-backdrop.webp, drifting
+  // in CSS): the menu builds no 3D world, so it is light on any GPU and the
+  // game loads its world once. The graphics auto-pick runs in the game.
+  canvas.style.visibility = 'hidden';
+  document.body.classList.add('menu-still');
   let leaving = false;
   const enterGame = (restore: boolean): void => {
     if (leaving) return;
     leaving = true;
     menu.hide();
-    void renderer.setAnimationLoop(null);
     location.assign(urlKeeping(session.params, { play: restore ? 'continue' : 'new' }));
   };
   const menu = createMainMenu({
@@ -520,23 +508,16 @@ async function startMenu(session: Session): Promise<void> {
   menu.show();
 
   let frames = 0;
-  let lastRender = 0;
   installHooks({
     frames: () => frames,
-    fogQuality: () => world.fog.getQuality(),
     gpuTextures: () => renderer.info.memory.textures,
-    renderFps: () => meter.fps(),
     menuOpen: () => menu.isOpen(),
   });
-  await renderer.setAnimationLoop((t: number) => {
-    // The first-launch benchmark measures uncapped; afterwards the cap applies.
-    if (!autoPick.running() && !shouldRender(t, lastRender, frameCap)) return;
-    lastRender = t;
-    backdrop.render(t / 1000);
+  const tick = (): void => {
     frames++;
-    meter.tick(t);
-    autoPick.tick(t);
-  });
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
 }
 
 async function boot(): Promise<void> {
@@ -572,6 +553,7 @@ async function boot(): Promise<void> {
   installHooks({ backend });
   installI18nHooks(i18n);
   setAssetRenderer(renderer);
+  setTextureBudget(textureResFor(settings.get().preset));
   installHooks({ loadModelInfo: async (slug) => (await import('./test/modelInfo')).describeModel(await loadModel(slug)) });
 
   // Dialogue and story state live for the whole session, whatever the scene.
