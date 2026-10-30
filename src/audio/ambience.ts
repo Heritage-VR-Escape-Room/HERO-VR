@@ -1,7 +1,6 @@
 /**
- * The night around the plaza: wind everywhere, a low hum from the fog around
- * the pyramid, and police sirens far to the south-west now and then. Wind and
- * rumble are global; the hum and the sirens are positional.
+ * The night around the plaza: wind everywhere, a city rumble, and a low hum
+ * from the fog around the pyramid (positional).
  */
 import { noiseBuffer } from './synth';
 
@@ -33,7 +32,7 @@ export interface Ambience {
   stop(): void;
 }
 
-export function startAmbience(ctx: AudioContext, out: AudioNode, opts: { humAt: Vec3; sirensAt: Vec3 }): Ambience {
+export function startAmbience(ctx: AudioContext, out: AudioNode, opts: { humAt: Vec3 }): Ambience {
   const nodes: AudioScheduledSourceNode[] = [];
   const start = <T extends AudioScheduledSourceNode>(n: T): T => {
     n.start();
@@ -82,33 +81,8 @@ export function startAmbience(ctx: AudioContext, out: AudioNode, opts: { humAt: 
     start(o);
   }
 
-  // Sirens far off: a two-tone wail every 35-70 s, muffled by distance.
-  const sirenOut = panner(ctx, opts.sirensAt, out, 250, 1);
-  const sf = ctx.createBiquadFilter();
-  sf.type = 'lowpass';
-  sf.frequency.value = 1300;
-  sf.connect(sirenOut);
-  let timer = 0;
-  const siren = (): void => {
-    const t = ctx.currentTime + 0.05;
-    const o = ctx.createOscillator();
-    o.type = 'triangle';
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(0.5, t + 1.5);
-    g.gain.setValueAtTime(0.5, t + 6.5);
-    g.gain.linearRampToValueAtTime(0.0001, t + 8.5);
-    for (let i = 0; i < 14; i++) o.frequency.setValueAtTime(i % 2 ? 860 : 650, t + i * 0.6);
-    o.connect(g).connect(sf);
-    o.start(t);
-    o.stop(t + 8.6);
-    timer = window.setTimeout(siren, 35_000 + Math.random() * 35_000);
-  };
-  timer = window.setTimeout(siren, 12_000);
-
   return {
     stop() {
-      window.clearTimeout(timer);
       for (const n of nodes) n.stop();
     },
   };

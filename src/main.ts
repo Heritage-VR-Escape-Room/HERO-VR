@@ -202,8 +202,9 @@ async function startGame(session: Session, sceneName: GameScene, opts: { newGame
       })
     : null;
   if (garden && plaza) {
-    // Hum from the fog around the pyramid; sirens 300 m to the south-west (west = +X).
-    audio.ambience({ humAt: { x: px, y: 3, z: pz }, sirensAt: { x: px + 212, y: 5, z: pz - 212 } });
+    // Hum from the fog around the pyramid, and the Act 0 theme.
+    audio.ambience({ humAt: { x: px, y: 3, z: pz } });
+    audio.music('act0');
     world.scene.add(plaza.root);
     for (const [name, vp] of Object.entries(plaza.viewpoints)) garden.addViewpoint(name, vp);
     world.fog.syncLights(); // the plaza's lamps join the fog (nearest ones, capped)
@@ -546,7 +547,7 @@ async function startMenu(session: Session): Promise<void> {
     lastGraphics = g;
     if (!x.presetAutoPicked) session.settings.update({ presetAutoPicked: true });
   });
-  // Menu sounds: hover ticks and clicks on every button, a soft drone once audio may start.
+  // Menu sounds: hover ticks and clicks on every button; the menu theme once audio may start.
   const { audio } = session;
   document.addEventListener('mouseover', (e) => {
     if ((e.target as Element | null)?.closest?.('button')) audio.play('ui_hover');
@@ -558,7 +559,7 @@ async function startMenu(session: Session): Promise<void> {
   const startDrone = (): void => {
     if (drone) return;
     drone = true;
-    audio.menuMusic();
+    audio.music('menu');
   };
   window.addEventListener('pointerdown', startDrone, { once: true });
   window.addEventListener('keydown', startDrone, { once: true });

@@ -10,6 +10,7 @@ import type { Surface } from '../world/colliders';
 import { startAmbience, panner } from './ambience';
 import { createMixer, type Volumes } from './mixer';
 import { footstep, sfx, type SfxName } from './synth';
+import { createMusic, type ThemeId } from './music';
 
 type Vec3 = { x: number; y: number; z: number };
 
@@ -17,10 +18,10 @@ export interface AudioEngine {
   play(name: SfxName, at?: Vec3, replay?: boolean): void;
   footstep(surface: Surface): void;
   /** Start the night ambience (game only). */
-  ambience(opts: { humAt: Vec3; sirensAt: Vec3 }): void;
+  ambience(opts: { humAt: Vec3 }): void;
   hum(on: boolean, at: Vec3): void;
-  /** A soft drone on the music bus (main menu). */
-  menuMusic(): void;
+  /** Crossfade to a theme (null: silence). */
+  music(id: ThemeId | null): void;
   setVolumes(v: Volumes): void;
   /** Move the listener to the camera; call once per frame. */
   update(camera: Camera): void;
@@ -33,6 +34,7 @@ export function createAudio(volumes: Volumes): AudioEngine {
   const m = createMixer(volumes);
   const { ctx } = m;
   const played: string[] = [];
+  const music = createMusic(ctx, m.music);
   const pickers = new Map<Surface, Picker>();
   const fwd = new Vector3();
   let humNode: { stop(): void } | null = null;
@@ -106,27 +108,9 @@ export function createAudio(volumes: Volumes): AudioEngine {
       wob.start();
       humNode = { stop: () => [...oscs, wob].forEach((o) => o.stop()) };
     },
-    menuMusic() {
-      // Two detuned fifths under a slowly opening filter.
-      const f = ctx.createBiquadFilter();
-      f.type = 'lowpass';
-      f.frequency.value = 400;
-      const g = ctx.createGain();
-      g.gain.value = 0.05;
-      f.connect(g).connect(m.music);
-      for (const hz of [73.4, 73.9, 110, 110.6, 146.8]) {
-        const o = ctx.createOscillator();
-        o.type = 'triangle';
-        o.frequency.value = hz;
-        o.connect(f);
-        o.start();
-      }
-      const lfo = ctx.createOscillator();
-      lfo.frequency.value = 0.05;
-      const d = ctx.createGain();
-      d.gain.value = 250;
-      lfo.connect(d).connect(f.frequency);
-      lfo.start();
+    music(id) {
+      note(`music_${id ?? 'none'}`);
+      music.play(id);
     },
     setVolumes: (v) => m.setVolumes(v),
     update(camera) {
